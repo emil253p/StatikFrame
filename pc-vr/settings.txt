@@ -2,8 +2,8 @@
 # Start Play Statik VR.bat. One key=value per line; # starts a comment.
 menu=1
 language=windows
-# Shared VR FOV: 70..100 percent of psvr or headset. PSVR is the tested default.
-fov=100
+# Shared VR FOV: 70..120 percent of psvr or headset. Over 100 is wider than PSVR's own.
+fov=110
 fov_of=psvr
 # Desktop view: stereo, spectator (one eye), or combined.
 desktop_view=stereo

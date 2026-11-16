@@ -570,8 +570,15 @@ struct OpenXrHost::Impl {
         has_frame_controller = enable_if_offered("XR_VALVE_frame_controller_interaction");
 
         XrInstanceCreateInfo info{XR_TYPE_INSTANCE_CREATE_INFO};
-        std::strcpy(info.applicationInfo.applicationName, "shadPS4");
-        info.applicationInfo.applicationVersion = 1;
+        // SteamVR keeps controller bindings by application name, and a binding it saved for
+        // "shadPS4" (any shadPS4 title, from before these bindings existed) wins over the
+        // ones suggested here. A name of its own starts from these.
+        // (SHADPS4_XR_APP_NAME=<name> for another.)
+        const char* app_name = std::getenv("SHADPS4_XR_APP_NAME");
+        std::snprintf(info.applicationInfo.applicationName,
+                      sizeof(info.applicationInfo.applicationName), "%s",
+                      app_name != nullptr && *app_name != '\0' ? app_name : "StatikQuest");
+        info.applicationInfo.applicationVersion = 2;
         std::strcpy(info.applicationInfo.engineName, "shadPS4");
         info.applicationInfo.apiVersion = XR_API_VERSION_1_0;
         info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
@@ -1247,6 +1254,67 @@ struct OpenXrHost::Impl {
         return true;
     }
 
+    /// For the log: which of the controllers' bindings the runtime uses for each hand.
+    void LogInteractionProfiles() {
+        if (session == XR_NULL_HANDLE) {
+            return;
+        }
+        for (int hand = 0; hand < 2; ++hand) {
+            XrInteractionProfileState profile{XR_TYPE_INTERACTION_PROFILE_STATE};
+            std::string name = "none";
+            if (XR_SUCCEEDED(xrGetCurrentInteractionProfile(session, hand_paths[hand], &profile)) &&
+                profile.interactionProfile != XR_NULL_PATH) {
+                char text[XR_MAX_PATH_LENGTH]{};
+                uint32_t length = 0;
+                if (XR_SUCCEEDED(xrPathToString(instance, profile.interactionProfile,
+                                                sizeof(text), &length, text))) {
+                    name = text;
+                }
+            }
+            LOG_INFO(Core_Vr, "The runtime uses the {} bindings for the {} controller", name,
+                     hand == 0 ? "left" : "right");
+        }
+    }
+
+    /// For the log: which of the controllers' actions have something bound to them.
+    void LogActiveActions() {
+        std::string inactive;
+        const auto check = [&](XrAction action, const char* name, int hand) {
+            XrActionStateGetInfo get{XR_TYPE_ACTION_STATE_GET_INFO};
+            get.action = action;
+            get.subactionPath = hand < 0 ? XR_NULL_PATH : hand_paths[hand];
+            bool active = false;
+            if (action == act_aims) {
+                XrActionStatePose state{XR_TYPE_ACTION_STATE_POSE};
+                active = XR_SUCCEEDED(xrGetActionStatePose(session, &get, &state)) &&
+                         state.isActive == XR_TRUE;
+            } else if (action == act_move || action == act_finger) {
+                XrActionStateVector2f state{XR_TYPE_ACTION_STATE_VECTOR2F};
+                active = XR_SUCCEEDED(xrGetActionStateVector2f(session, &get, &state)) &&
+                         state.isActive == XR_TRUE;
+            } else {
+                XrActionStateBoolean state{XR_TYPE_ACTION_STATE_BOOLEAN};
+                active = XR_SUCCEEDED(xrGetActionStateBoolean(session, &get, &state)) &&
+                         state.isActive == XR_TRUE;
+            }
+            if (!active) {
+                inactive += inactive.empty() ? name : std::string{", "} + name;
+            }
+        };
+        check(act_move, "left stick", -1);
+        check(act_finger, "right stick", -1);
+        check(act_cross, "cross", -1);
+        check(act_circle, "circle", -1);
+        check(act_square, "square", -1);
+        check(act_triangle, "triangle", -1);
+        check(act_up, "D-pad", -1);
+        check(act_options, "options", -1);
+        check(act_aims, "left aim", 0);
+        check(act_aims, "right aim", 1);
+        LOG_INFO(Core_Vr, "Controller actions without a binding: {}",
+                 inactive.empty() ? "none" : inactive);
+    }
+
     void ReleaseControllers(const char* why) {
         if (!controllers_used) {
             return;
@@ -1436,6 +1504,8 @@ struct OpenXrHost::Impl {
         if (!controllers_used) {
             controllers_used = true;
             controller->SetHeadsetPlays(true);
+            LogInteractionProfiles();
+            LogActiveActions();
             LOG_INFO(Core_Vr,
                      "{}: the headset's controllers stand in for "
                      "it (left stick to move, right A = cross, right B = square, left X/A = "
@@ -1799,6 +1869,9 @@ struct OpenXrHost::Impl {
                 }
                 break;
             }
+            case XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED:
+                LogInteractionProfiles();
+                break;
             case XR_TYPE_EVENT_DATA_DISPLAY_REFRESH_RATE_CHANGED_FB: {
                 const auto& changed =
                     *reinterpret_cast<const XrEventDataDisplayRefreshRateChangedFB*>(&event);

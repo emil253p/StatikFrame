@@ -694,11 +694,11 @@ function Show-Menu {
     $y += 22
     $fov = New-Object System.Windows.Forms.TrackBar
     $fov.Minimum = 14
-    $fov.Maximum = 20
+    $fov.Maximum = 24
     $fov.TickFrequency = 1
     $fov.LargeChange = 1
     $fov.SetBounds(12, $y, 300, 40)
-    $fov.Value = [math]::Max(14, [math]::Min(20, [int]([int](Setting "fov" "100") / 5)))
+    $fov.Value = [math]::Max(14, [math]::Min(24, [int]([int](Setting "fov" "110") / 5)))
     $form.Controls.Add($fov)
     $fovText = New-Object System.Windows.Forms.Label
     $fovText.SetBounds(316, $y + 4, 230, 40)
@@ -708,6 +708,8 @@ function Show-Menu {
         $percent = $fov.Value * 5
         if ($percent -eq 100) {
             $fovText.Text = $(if ($ofPsvr) { "100%: PlayStation VR's own" } else { "100%: all that the headset shows" })
+        } elseif ($percent -gt 100) {
+            $fovText.Text = "$percent%: wider, a little less sharp"
         } else {
             $fovText.Text = "$percent% of it: sharper, with a dark border"
         }
@@ -924,7 +926,7 @@ if ((Setting "predict_ms") -ne "") { $env:SHADPS4_XR_PREDICT_MS = Setting "predi
 if ((Setting "stick_touchpad" "1") -eq "0") { $env:SHADPS4_STICK_TOUCHPAD = "0" }
 if ((Setting "mic_gain") -ne "") { $env:SHADPS4_MIC_GAIN = Setting "mic_gain" }
 if ((Setting "surround" "1") -eq "0") { $env:SHADPS4_VIRTUAL_SURROUND = "0" }
-$fovSetting = Setting "fov" "100"
+$fovSetting = Setting "fov" "110"
 if ($fovSetting -ne "100") { $env:SHADPS4_VR_FOV = $fovSetting }
 # fov_of: what fov is a percent of. headset: what the headset being worn shows, all of it at 100
 # (the emulator asks the headset as it starts). psvr: a PlayStation VR's, as the game was made.

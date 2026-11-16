@@ -46,8 +46,8 @@ installation paths short.
 
 - **Console language**: Windows' language or a selected console language.
   Availability depends on your copy of the game.
-- **Field of view**: 70–100 percent. PSVR is the conservative default;
-  `fov_of=headset` uses the headset's reported view. Test eye alignment.
+- **Field of view**: 70–120 percent (110 by default; over 100 is wider than
+  PSVR's own, spreading the same pixels a little thinner). `fov_of=headset` uses the headset's reported view. Test eye alignment.
 - **Desktop view**: stereo, single-eye spectator or combined-eye spectator,
   optionally cropping top/bottom to fill the window.
 - **PS4 Pro mode**: on by default. Statik renders each eye at 1728×1944, as on
