@@ -152,6 +152,35 @@ XrVector3f Rotate(const XrQuaternionf& q, const XrVector3f& v) {
     return {rotated.x, rotated.y, rotated.z};
 }
 
+XrVector3f Cross(const XrVector3f& a, const XrVector3f& b) {
+    return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+}
+
+float Length(const XrVector3f& v) {
+    return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+/// The turn whose X, Y and Z axes are the given ones (unit length, at right angles, X×Y = Z).
+XrQuaternionf FromAxes(const XrVector3f& x, const XrVector3f& y, const XrVector3f& z) {
+    XrQuaternionf q;
+    const float trace = x.x + y.y + z.z;
+    if (trace > 0.0f) {
+        const float s = std::sqrt(trace + 1.0f) * 2.0f;
+        q = {(y.z - z.y) / s, (z.x - x.z) / s, (x.y - y.x) / s, 0.25f * s};
+    } else if (x.x > y.y && x.x > z.z) {
+        const float s = std::sqrt(1.0f + x.x - y.y - z.z) * 2.0f;
+        q = {0.25f * s, (y.x + x.y) / s, (z.x + x.z) / s, (y.z - z.y) / s};
+    } else if (y.y > z.z) {
+        const float s = std::sqrt(1.0f + y.y - x.x - z.z) * 2.0f;
+        q = {(y.x + x.y) / s, 0.25f * s, (z.y + y.z) / s, (z.x - x.z) / s};
+    } else {
+        const float s = std::sqrt(1.0f + z.z - x.x - y.y) * 2.0f;
+        q = {(z.x + x.z) / s, (z.y + y.z) / s, 0.25f * s, (x.y - y.x) / s};
+    }
+    const float n = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+    return {q.x / n, q.y / n, q.z / n, q.w / n};
+}
+
 std::string Narrow(const wchar_t* text) {
     const int size = WideCharToMultiByte(CP_UTF8, 0, text, -1, nullptr, 0, nullptr, nullptr);
     if (size <= 1) {
@@ -312,6 +341,7 @@ struct OpenXrHost::Impl {
     bool has_hand_tracking{};
     bool has_refresh_rate{};
     bool has_audio_guid{};
+    bool has_frame_controller{};
     XrInstance instance{XR_NULL_HANDLE};
     XrSystemId system{XR_NULL_SYSTEM_ID};
     std::string runtime_name;
@@ -425,10 +455,32 @@ struct OpenXrHost::Impl {
     XrAction act_r2{XR_NULL_HANDLE};
     XrAction act_options{XR_NULL_HANDLE};
     XrAction act_l3{XR_NULL_HANDLE};
+    XrAction act_up{XR_NULL_HANDLE};
+    XrAction act_down{XR_NULL_HANDLE};
+    XrAction act_left{XR_NULL_HANDLE};
+    XrAction act_right{XR_NULL_HANDLE};
     XrAction act_finger_press{XR_NULL_HANDLE};
     XrAction act_pose{XR_NULL_HANDLE};
     XrAction act_grip{XR_NULL_HANDLE};
     XrAction act_rumble{XR_NULL_HANDLE};
+    // Both controllers' aim, for holding the game's controller in two hands.
+    XrAction act_aims{XR_NULL_HANDLE};
+    XrSpace aim_spaces[2]{XR_NULL_HANDLE, XR_NULL_HANDLE};
+    bool two_hands{true};
+    // Metres the game's controller sits towards the player from the two controllers when
+    // both hold it, so the hands are inside the box rather than at its opening.
+    float two_hands_depth{0.08f};
+    // Hands closer than near: the box's sideways axis is the wrists'; farther than far: the
+    // line between the hands; in between, a mix (metres).
+    float two_hands_steady_near{0.10f};
+    float two_hands_steady_far{0.30f};
+    // What the right stick is to the game: a finger on the touchpad, its right stick, or both.
+    bool right_stick_finger{true};
+    bool right_stick_stick{true};
+    bool two_hands_held{};
+    XrQuaternionf two_hands_turn{0.0f, 0.0f, 0.0f, 1.0f};
+    XrTime two_hands_time{};
+    XrVector3f two_hands_spin{};
     XrPath hand_paths[2]{XR_NULL_PATH, XR_NULL_PATH};
     XrSpace controller_space{XR_NULL_HANDLE};
     // Where each hand holds something, as far as the headset's runtime says where its own
@@ -523,10 +575,20 @@ struct OpenXrHost::Impl {
         hand_extension = track_hands && enable_if_offered(XR_EXT_HAND_TRACKING_EXTENSION_NAME);
         has_refresh_rate = enable_if_offered(XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME);
         has_audio_guid = enable_if_offered(XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
+        // Steam Frame controllers: without their own bindings SteamVR remaps the Touch ones,
+        // which puts three buttons on each of Touch's B and Y and loses the rest.
+        has_frame_controller = enable_if_offered("XR_VALVE_frame_controller_interaction");
 
         XrInstanceCreateInfo info{XR_TYPE_INSTANCE_CREATE_INFO};
-        std::strcpy(info.applicationInfo.applicationName, "shadPS4");
-        info.applicationInfo.applicationVersion = 1;
+        // SteamVR keeps controller bindings by application name, and a binding it saved for
+        // "shadPS4" (any shadPS4 title, from before these bindings existed) wins over the
+        // ones suggested here. A name of its own starts from these.
+        // (SHADPS4_XR_APP_NAME=<name> for another.)
+        const char* app_name = std::getenv("SHADPS4_XR_APP_NAME");
+        std::snprintf(info.applicationInfo.applicationName,
+                      sizeof(info.applicationInfo.applicationName), "%s",
+                      app_name != nullptr && *app_name != '\0' ? app_name : "StatikQuest");
+        info.applicationInfo.applicationVersion = 2;
         std::strcpy(info.applicationInfo.engineName, "shadPS4");
         info.applicationInfo.apiVersion = XR_API_VERSION_1_0;
         info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
@@ -934,8 +996,13 @@ struct OpenXrHost::Impl {
         made = made && make(act_r2, "r2", "R2", XR_ACTION_TYPE_FLOAT_INPUT);
         made = made && make(act_options, "options", "Options", XR_ACTION_TYPE_BOOLEAN_INPUT);
         made = made && make(act_l3, "l3", "L3", XR_ACTION_TYPE_BOOLEAN_INPUT);
+        made = made && make(act_up, "dpad_up", "D-pad up", XR_ACTION_TYPE_BOOLEAN_INPUT);
+        made = made && make(act_down, "dpad_down", "D-pad down", XR_ACTION_TYPE_BOOLEAN_INPUT);
+        made = made && make(act_left, "dpad_left", "D-pad left", XR_ACTION_TYPE_BOOLEAN_INPUT);
+        made = made && make(act_right, "dpad_right", "D-pad right", XR_ACTION_TYPE_BOOLEAN_INPUT);
         made = made && make(act_pose, "controller", "Controller", XR_ACTION_TYPE_POSE_INPUT);
         made = made && make(act_grip, "hands", "Hands", XR_ACTION_TYPE_POSE_INPUT, true);
+        made = made && make(act_aims, "aims", "Both controllers", XR_ACTION_TYPE_POSE_INPUT, true);
         made = made &&
                make(act_rumble, "rumble", "Rumble", XR_ACTION_TYPE_VIBRATION_OUTPUT, true);
         if (!made) {
@@ -971,6 +1038,8 @@ struct OpenXrHost::Impl {
                                          : "/user/hand/right/input/aim/pose");
             bind(act_grip, "/user/hand/left/input/grip/pose");
             bind(act_grip, "/user/hand/right/input/grip/pose");
+            bind(act_aims, "/user/hand/left/input/aim/pose");
+            bind(act_aims, "/user/hand/right/input/aim/pose");
             bind(act_rumble, "/user/hand/left/output/haptic");
             bind(act_rumble, "/user/hand/right/output/haptic");
             XrInteractionProfileSuggestedBinding suggested{
@@ -986,6 +1055,9 @@ struct OpenXrHost::Impl {
                 LOG_WARNING(Core_Vr, "The headset's runtime takes no {} controller bindings: {}",
                             index ? "Index" : "Touch", ResultText(instance, result));
             }
+        }
+        if (has_frame_controller) {
+            SuggestFrameControllerBindings();
         }
 
         XrSessionActionSetsAttachInfo attach{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
@@ -1011,8 +1083,280 @@ struct OpenXrHost::Impl {
             if (XR_FAILED(xrCreateActionSpace(session, &space_info, &grip_spaces[hand]))) {
                 grip_spaces[hand] = XR_NULL_HANDLE;
             }
+            space_info.action = act_aims;
+            if (XR_FAILED(xrCreateActionSpace(session, &space_info, &aim_spaces[hand]))) {
+                aim_spaces[hand] = XR_NULL_HANDLE;
+            }
         }
         actions_ready = true;
+    }
+
+    /// Steam Frame controllers have a whole gamepad between them: the left one a D-pad and
+    /// a View button, the right one A, B, X and Y and a Menu button, and each a bumper as
+    /// well as a grip. The face buttons are where a DualShock's are (A ✕, B ○, X □, Y △, so
+    /// B and Y together blow), the D-pad is the D-pad, View and Menu are OPTIONS, bumpers
+    /// and grips are L1 and R1; sticks, triggers and poses are as on the other controllers.
+    void SuggestFrameControllerBindings() {
+        std::vector<XrActionSuggestedBinding> bindings;
+        const auto bind = [&](XrAction action, const char* path) {
+            XrPath binding = XR_NULL_PATH;
+            if (XR_SUCCEEDED(xrStringToPath(instance, path, &binding))) {
+                bindings.push_back({action, binding});
+            }
+        };
+        bind(act_move, "/user/hand/left/input/thumbstick");
+        bind(act_l3, "/user/hand/left/input/thumbstick/click");
+        bind(act_finger, "/user/hand/right/input/thumbstick");
+        bind(act_finger_press, "/user/hand/right/input/thumbstick/click");
+        bind(act_cross, "/user/hand/right/input/a/click");
+        bind(act_circle, "/user/hand/right/input/b/click");
+        bind(act_square, "/user/hand/right/input/x/click");
+        bind(act_triangle, "/user/hand/right/input/y/click");
+        bind(act_up, "/user/hand/left/input/dpad_up/click");
+        bind(act_down, "/user/hand/left/input/dpad_down/click");
+        bind(act_left, "/user/hand/left/input/dpad_left/click");
+        bind(act_right, "/user/hand/left/input/dpad_right/click");
+        bind(act_options, "/user/hand/left/input/view/click");
+        bind(act_options, "/user/hand/right/input/menu/click");
+        bind(act_l1, "/user/hand/left/input/squeeze/value");
+        bind(act_l1, "/user/hand/left/input/bumper/click");
+        bind(act_r1, "/user/hand/right/input/squeeze/value");
+        bind(act_r1, "/user/hand/right/input/bumper/click");
+        bind(act_l2, "/user/hand/left/input/trigger/value");
+        bind(act_r2, "/user/hand/right/input/trigger/value");
+        bind(act_pose, pad_hand == 0 ? "/user/hand/left/input/aim/pose"
+                                     : "/user/hand/right/input/aim/pose");
+        bind(act_grip, "/user/hand/left/input/grip/pose");
+        bind(act_grip, "/user/hand/right/input/grip/pose");
+        bind(act_aims, "/user/hand/left/input/aim/pose");
+        bind(act_aims, "/user/hand/right/input/aim/pose");
+        bind(act_rumble, "/user/hand/left/output/haptic");
+        bind(act_rumble, "/user/hand/right/output/haptic");
+        XrInteractionProfileSuggestedBinding suggested{
+            XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
+        xrStringToPath(instance, "/interaction_profiles/valve/frame_controller_valve",
+                       &suggested.interactionProfile);
+        const auto suggest = [&](const std::vector<XrActionSuggestedBinding>& list) {
+            suggested.countSuggestedBindings = static_cast<uint32_t>(list.size());
+            suggested.suggestedBindings = list.data();
+            return xrSuggestInteractionProfileBindings(instance, &suggested);
+        };
+        const XrResult result = suggest(bindings);
+        if (XR_SUCCEEDED(result)) {
+            LOG_INFO(Core_Vr, "Steam Frame controller bindings suggested");
+            return;
+        }
+        // One path the runtime does not know rejects them all: keep the ones it takes (each
+        // suggestion replaces the one before, so the last call is the one that counts).
+        std::vector<XrActionSuggestedBinding> taken;
+        for (const XrActionSuggestedBinding& binding : bindings) {
+            if (XR_SUCCEEDED(suggest({binding}))) {
+                taken.push_back(binding);
+            }
+        }
+        if (taken.empty() || XR_FAILED(suggest(taken))) {
+            LOG_WARNING(Core_Vr, "The headset's runtime takes no Steam Frame controller "
+                                 "bindings: {}",
+                        ResultText(instance, result));
+            return;
+        }
+        LOG_WARNING(Core_Vr, "Steam Frame controller bindings suggested, {} of {} taken ({})",
+                    taken.size(), bindings.size(), ResultText(instance, result));
+    }
+
+    /// The game's controller held in both hands, as a DualShock is: it is halfway between
+    /// the two controllers, its sideways axis runs from the left one to the right one (so
+    /// raising one hand tilts it, pushing one forward turns it, like a steering wheel), and
+    /// it tips forward and back as the two wrists do together. False while either controller
+    /// is not tracked, or they are not apart, in which case one controller holds it.
+    bool LocateTwoHands(XrTime time, XrSpaceLocation& location, XrSpaceVelocity& velocity) {
+        static constexpr XrSpaceLocationFlags Needed =
+            XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+        XrPosef poses[2];
+        XrVector3f moving[2]{};
+        int moving_count = 0;
+        for (int hand = 0; hand < 2; ++hand) {
+            if (aim_spaces[hand] == XR_NULL_HANDLE) {
+                return false;
+            }
+            XrSpaceVelocity hand_velocity{XR_TYPE_SPACE_VELOCITY};
+            XrSpaceLocation hand_location{XR_TYPE_SPACE_LOCATION};
+            hand_location.next = &hand_velocity;
+            if (XR_FAILED(xrLocateSpace(aim_spaces[hand], local_space, time, &hand_location)) ||
+                (hand_location.locationFlags & Needed) != Needed) {
+                return false;
+            }
+            poses[hand] = hand_location.pose;
+            if ((hand_velocity.velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0) {
+                moving[hand] = hand_velocity.linearVelocity;
+                ++moving_count;
+            }
+        }
+        const XrVector3f& left = poses[0].position;
+        const XrVector3f& right = poses[1].position;
+        XrVector3f across{right.x - left.x, right.y - left.y, right.z - left.z};
+        const float apart = Length(across);
+        // (Hands together, or one stretched far away to point at something, hold nothing.)
+        if (apart < 0.06f || apart > 1.2f) {
+            return false;
+        }
+        across = {across.x / apart, across.y / apart, across.z / apart};
+        // Close together, a centimetre's wobble of one hand swings the line between them by
+        // several degrees, so the box would turn too fast: there, its sideways axis comes
+        // more and more from the two wrists' own sideways axes, which are as steady at any
+        // distance (by default only the wrists below 10 cm apart, only the line between the
+        // hands from 30 cm, a smooth mix in between).
+        const XrVector3f side_left = Rotate(poses[0].orientation, {1.0f, 0.0f, 0.0f});
+        const XrVector3f side_right = Rotate(poses[1].orientation, {1.0f, 0.0f, 0.0f});
+        XrVector3f wrists{side_left.x + side_right.x, side_left.y + side_right.y,
+                          side_left.z + side_right.z};
+        const float wrists_length = Length(wrists);
+        if (wrists_length > 0.5f && two_hands_steady_far > two_hands_steady_near) {
+            wrists = {wrists.x / wrists_length, wrists.y / wrists_length,
+                      wrists.z / wrists_length};
+            float line = (apart - two_hands_steady_near) /
+                         (two_hands_steady_far - two_hands_steady_near);
+            line = line < 0.0f ? 0.0f : (line > 1.0f ? 1.0f : line);
+            line = line * line * (3.0f - 2.0f * line);
+            const XrVector3f mixed{across.x * line + wrists.x * (1.0f - line),
+                                   across.y * line + wrists.y * (1.0f - line),
+                                   across.z * line + wrists.z * (1.0f - line)};
+            const float mixed_length = Length(mixed);
+            if (mixed_length > 0.3f) {
+                across = {mixed.x / mixed_length, mixed.y / mixed_length,
+                          mixed.z / mixed_length};
+            }
+        }
+        const XrVector3f up_left = Rotate(poses[0].orientation, {0.0f, 1.0f, 0.0f});
+        const XrVector3f up_right = Rotate(poses[1].orientation, {0.0f, 1.0f, 0.0f});
+        const XrVector3f up{up_left.x + up_right.x, up_left.y + up_right.y,
+                            up_left.z + up_right.z};
+        XrVector3f back = Cross(across, up);
+        const float back_length = Length(back);
+        if (back_length < 0.2f) {
+            // The wrists turned so far that "up" is along the line between them.
+            return false;
+        }
+        back = {back.x / back_length, back.y / back_length, back.z / back_length};
+        const XrVector3f top = Cross(back, across);
+        const XrQuaternionf turn = FromAxes(across, top, back);
+
+        location.locationFlags = Needed | XR_SPACE_LOCATION_POSITION_TRACKED_BIT |
+                                 XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT;
+        location.pose.orientation = turn;
+        // Towards the player from between the hands: it turns about the hands inside it,
+        // not about its opening.
+        location.pose.position = {(left.x + right.x) * 0.5f + back.x * two_hands_depth,
+                                  (left.y + right.y) * 0.5f + back.y * two_hands_depth,
+                                  (left.z + right.z) * 0.5f + back.z * two_hands_depth};
+        velocity.velocityFlags = 0;
+        if (moving_count == 2) {
+            velocity.linearVelocity = {(moving[0].x + moving[1].x) * 0.5f,
+                                       (moving[0].y + moving[1].y) * 0.5f,
+                                       (moving[0].z + moving[1].z) * 0.5f};
+            velocity.velocityFlags |= XR_SPACE_VELOCITY_LINEAR_VALID_BIT;
+        }
+        // How fast it turns, from how it turned since the last time (each controller's own
+        // spin is not the spin of what both hold).
+        if (two_hands_held && time > two_hands_time) {
+            const float elapsed = static_cast<float>(time - two_hands_time) * 1e-9f;
+            if (elapsed < 0.1f) {
+                const XrQuaternionf& a = two_hands_turn;
+                // turn * conjugate(a): the step from then to now, in the room's directions.
+                XrQuaternionf step{
+                    turn.w * -a.x + turn.x * a.w + turn.y * -a.z - turn.z * -a.y,
+                    turn.w * -a.y - turn.x * -a.z + turn.y * a.w + turn.z * -a.x,
+                    turn.w * -a.z + turn.x * -a.y - turn.y * -a.x + turn.z * a.w,
+                    turn.w * a.w - turn.x * -a.x - turn.y * -a.y - turn.z * -a.z};
+                if (step.w < 0.0f) {
+                    step = {-step.x, -step.y, -step.z, -step.w};
+                }
+                const float sine = Length({step.x, step.y, step.z});
+                const float angle = 2.0f * std::atan2(sine, step.w);
+                XrVector3f spin{};
+                if (sine > 1e-6f) {
+                    const float rate = angle / elapsed / sine;
+                    spin = {step.x * rate, step.y * rate, step.z * rate};
+                }
+                const float blend = 0.5f;
+                two_hands_spin.x += (spin.x - two_hands_spin.x) * blend;
+                two_hands_spin.y += (spin.y - two_hands_spin.y) * blend;
+                two_hands_spin.z += (spin.z - two_hands_spin.z) * blend;
+                velocity.angularVelocity = two_hands_spin;
+                velocity.velocityFlags |= XR_SPACE_VELOCITY_ANGULAR_VALID_BIT;
+            }
+        } else {
+            two_hands_spin = {};
+        }
+        two_hands_turn = turn;
+        two_hands_time = time;
+        return true;
+    }
+
+    /// The other hand's grip held: the right stick turns the view (see UpdateControllers).
+    bool turning_now(float left_grip, float right_grip) const {
+        return (pad_hand == 0 ? right_grip : left_grip) > 0.5f;
+    }
+
+    /// For the log: which of the controllers' bindings the runtime uses for each hand.
+    void LogInteractionProfiles() {
+        if (session == XR_NULL_HANDLE) {
+            return;
+        }
+        for (int hand = 0; hand < 2; ++hand) {
+            XrInteractionProfileState profile{XR_TYPE_INTERACTION_PROFILE_STATE};
+            std::string name = "none";
+            if (XR_SUCCEEDED(xrGetCurrentInteractionProfile(session, hand_paths[hand], &profile)) &&
+                profile.interactionProfile != XR_NULL_PATH) {
+                char text[XR_MAX_PATH_LENGTH]{};
+                uint32_t length = 0;
+                if (XR_SUCCEEDED(xrPathToString(instance, profile.interactionProfile,
+                                                sizeof(text), &length, text))) {
+                    name = text;
+                }
+            }
+            LOG_INFO(Core_Vr, "The runtime uses the {} bindings for the {} controller", name,
+                     hand == 0 ? "left" : "right");
+        }
+    }
+
+    /// For the log: which of the controllers' actions have something bound to them.
+    void LogActiveActions() {
+        std::string inactive;
+        const auto check = [&](XrAction action, const char* name, int hand) {
+            XrActionStateGetInfo get{XR_TYPE_ACTION_STATE_GET_INFO};
+            get.action = action;
+            get.subactionPath = hand < 0 ? XR_NULL_PATH : hand_paths[hand];
+            bool active = false;
+            if (action == act_aims) {
+                XrActionStatePose state{XR_TYPE_ACTION_STATE_POSE};
+                active = XR_SUCCEEDED(xrGetActionStatePose(session, &get, &state)) &&
+                         state.isActive == XR_TRUE;
+            } else if (action == act_move || action == act_finger) {
+                XrActionStateVector2f state{XR_TYPE_ACTION_STATE_VECTOR2F};
+                active = XR_SUCCEEDED(xrGetActionStateVector2f(session, &get, &state)) &&
+                         state.isActive == XR_TRUE;
+            } else {
+                XrActionStateBoolean state{XR_TYPE_ACTION_STATE_BOOLEAN};
+                active = XR_SUCCEEDED(xrGetActionStateBoolean(session, &get, &state)) &&
+                         state.isActive == XR_TRUE;
+            }
+            if (!active) {
+                inactive += inactive.empty() ? name : std::string{", "} + name;
+            }
+        };
+        check(act_move, "left stick", -1);
+        check(act_finger, "right stick", -1);
+        check(act_cross, "cross", -1);
+        check(act_circle, "circle", -1);
+        check(act_square, "square", -1);
+        check(act_triangle, "triangle", -1);
+        check(act_up, "D-pad", -1);
+        check(act_options, "options", -1);
+        check(act_aims, "left aim", 0);
+        check(act_aims, "right aim", 1);
+        LOG_INFO(Core_Vr, "Controller actions without a binding: {}",
+                 inactive.empty() ? "none" : inactive);
     }
 
     void ReleaseControllers(const char* why) {
@@ -1149,6 +1493,10 @@ struct OpenXrHost::Impl {
         add(circle && !blow, Buttons::Circle);
         add(triangle && !blow, Buttons::Triangle);
         add(pressed(act_options), Buttons::Options);
+        add(pressed(act_up), Buttons::Up);
+        add(pressed(act_down), Buttons::Down);
+        add(pressed(act_left), Buttons::Left);
+        add(pressed(act_right), Buttons::Right);
         const bool left_stick_in = pressed(act_l3);
         const bool right_stick_in = pressed(act_finger_press);
         const float left_grip = std::max(pulled(act_l1), pad_hand == 0 ? 0.0f : test_grip);
@@ -1181,7 +1529,11 @@ struct OpenXrHost::Impl {
                            (True(buttons & Buttons::Square) ? 2u : 0u) | (circle ? 4u : 0u) |
                            (triangle ? 8u : 0u) | (left_stick_in ? 16u : 0u) |
                            (right_stick_in ? 32u : 0u) | (pushed(move) ? 64u : 0u) |
-                           (pushed(finger) ? 128u : 0u);
+                           (pushed(finger) ? 128u : 0u) |
+                           (True(buttons & (Buttons::Up | Buttons::Down | Buttons::Left |
+                                             Buttons::Right))
+                                ? 256u
+                                : 0u);
         const bool used = (in_use & ~controllers_in_use) != 0;
         controllers_in_use = in_use;
         if (!Input::FirstPadSource().Update(seconds, gamepad, used)) {
@@ -1196,6 +1548,8 @@ struct OpenXrHost::Impl {
         if (!controllers_used) {
             controllers_used = true;
             controller->SetHeadsetPlays(true);
+            LogInteractionProfiles();
+            LogActiveActions();
             LOG_INFO(Core_Vr,
                      "{}: the headset's controllers stand in for "
                      "it (left stick to move, right A = cross, right B = square, left X/A = "
@@ -1221,7 +1575,10 @@ struct OpenXrHost::Impl {
         }
         view_reset_held = view_reset;
         add(left_stick_in && !view_reset, Buttons::L3);
-        add(right_stick_in && !view_reset, Buttons::TouchPad);
+        // The right stick pressed in is R3 where it is the right stick, and presses the
+        // touchpad where it is the finger on it.
+        add(right_stick_in && !view_reset && right_stick_stick, Buttons::R3);
+        add(right_stick_in && !view_reset && right_stick_finger, Buttons::TouchPad);
 
         const auto axis = [](float value) {
             return std::clamp(static_cast<int>(std::lround(128.0f + value * 127.0f)), 0, 255);
@@ -1231,8 +1588,14 @@ struct OpenXrHost::Impl {
             return value < 0.12f ? 0 : static_cast<int>(std::lround(value * 255.0f));
         };
         // A stick pushed away from the player says +1 here, and 0 on a gamepad.
+        const bool as_stick = right_stick_stick && !turning_now(left_grip, right_grip);
         const std::array<int, 6> axes{
-            axis(move.x), axis(-move.y), 128, 128, trigger(left_trigger), trigger(right_trigger),
+            axis(move.x),
+            axis(-move.y),
+            as_stick ? axis(finger.x) : 128,
+            as_stick ? axis(-finger.y) : 128,
+            trigger(left_trigger),
+            trigger(right_trigger),
         };
         // (The trigger buttons follow from the axes where they are applied.)
         if (axes[4] > 0) {
@@ -1269,13 +1632,13 @@ struct OpenXrHost::Impl {
             if (made.pressed) {
                 buttons |= Buttons::TouchPad;
             }
-        } else if (turning) {
+        } else if (turning || !right_stick_finger) {
             stick_finger.Reset();
         } else {
             dragged = stick_finger.Update(seconds, finger.x, -finger.y);
         }
         const bool swiping = made.down || dragged.down;
-        const bool touch = swiping || (right_stick_in && !view_reset);
+        const bool touch = swiping || (right_stick_in && !view_reset && right_stick_finger);
         const float touch_x = made.down ? made.x : dragged.down ? dragged.x : 0.5f;
         const float touch_y = made.down ? made.y : dragged.down ? dragged.y : 0.5f;
         if (buttons != sent_buttons || axes != sent_axes || touch != sent_touch ||
@@ -1295,10 +1658,17 @@ struct OpenXrHost::Impl {
         XrSpaceVelocity velocity{XR_TYPE_SPACE_VELOCITY};
         XrSpaceLocation location{XR_TYPE_SPACE_LOCATION};
         location.next = &velocity;
+        const bool both = two_hands && LocateTwoHands(time, location, velocity);
         const bool located =
-            XR_SUCCEEDED(xrLocateSpace(controller_space, local_space, time, &location)) &&
-            (location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0 &&
-            (location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0;
+            both || (XR_SUCCEEDED(xrLocateSpace(controller_space, local_space, time, &location)) &&
+                     (location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0 &&
+                     (location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0);
+        if (both != two_hands_held) {
+            two_hands_held = both;
+            LOG_INFO(Core_Vr, "The controller in the game is held {}",
+                     both ? "in both hands, between the two controllers"
+                          : "by one controller");
+        }
         if (located) {
             // (SHADPS4_XR_PAD_OFFSET: where the gamepad is taken to be, from the point the
             // controller is located at and in the controller's own directions.)
@@ -1453,6 +1823,13 @@ struct OpenXrHost::Impl {
                 space = XR_NULL_HANDLE;
             }
         }
+        for (XrSpace& space : aim_spaces) {
+            if (space != XR_NULL_HANDLE) {
+                xrDestroySpace(space);
+                space = XR_NULL_HANDLE;
+            }
+        }
+        two_hands_held = false;
         if (action_set != XR_NULL_HANDLE) {
             // (Its actions go with it.)
             xrDestroyActionSet(action_set);
@@ -1545,6 +1922,9 @@ struct OpenXrHost::Impl {
                 }
                 break;
             }
+            case XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED:
+                LogInteractionProfiles();
+                break;
             case XR_TYPE_EVENT_DATA_DISPLAY_REFRESH_RATE_CHANGED_FB: {
                 const auto& changed =
                     *reinterpret_cast<const XrEventDataDisplayRefreshRateChangedFB*>(&event);
@@ -2623,6 +3003,28 @@ bool OpenXrHost::Connect() {
     impl->use_controllers =
         EnvFlag("SHADPS4_XR_CONTROLLERS", script == nullptr || script[0] == '\0');
     impl->use_grips = impl->track_hands && EnvFlag("SHADPS4_XR_GRIPS", true);
+    // SHADPS4_XR_TWO_HANDS=0: one controller (SHADPS4_XR_PAD_HAND) holds the game's
+    // controller, not both together.
+    impl->two_hands = EnvFlag("SHADPS4_XR_TWO_HANDS", true);
+    // SHADPS4_XR_BOX_DEPTH: centimetres the box held in both hands sits towards the player
+    // from between the controllers (8 by default; 0 holds it at the controllers' tips).
+    impl->two_hands_depth = EnvFloat("SHADPS4_XR_BOX_DEPTH", 8.0f) * 0.01f;
+    // SHADPS4_XR_BOX_STEADY=near,far: centimetres apart below which the box's sideways
+    // axis comes from the wrists alone, and above which from the line between the hands.
+    if (const char* steady = std::getenv("SHADPS4_XR_BOX_STEADY"); steady != nullptr) {
+        float near_cm = 0.0f, far_cm = 0.0f;
+        if (std::sscanf(steady, "%f,%f", &near_cm, &far_cm) == 2) {
+            impl->two_hands_steady_near = near_cm * 0.01f;
+            impl->two_hands_steady_far = far_cm * 0.01f;
+        }
+    }
+    // SHADPS4_XR_RIGHT_STICK=touchpad, stick or both (the default): what the headset
+    // controllers' right stick is to the game.
+    if (const char* right = std::getenv("SHADPS4_XR_RIGHT_STICK"); right != nullptr) {
+        const std::string_view mode{right};
+        impl->right_stick_finger = mode != "stick";
+        impl->right_stick_stick = mode != "touchpad";
+    }
     if (const char* hand = std::getenv("SHADPS4_XR_PAD_HAND"); hand != nullptr) {
         impl->pad_hand = hand[0] == 'l' || hand[0] == 'L' ? 0 : 1;
     }

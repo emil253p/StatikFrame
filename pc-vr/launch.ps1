@@ -160,18 +160,43 @@ function Get-FrameRateRefresh([string]$rate) {
     if ($rate -eq "90") { return "90" }
     return "120"
 }
-function Set-FrameRate([string]$gameFolder, [string]$rate) {
+
+# How sharp the game draws, in the same file: Statik's PSVR settings give each eye a percentage
+# of the headset's 960x1080 panel, 145% on a base PS4 (1392x1566) and 180% on a PS4 Pro
+# (1728x1944). "game" leaves that as it is; a number is the percentage for the mode played.
+$resolutionScales = @("game", "200", "220", "240", "260", "280", "300")
+function Get-ResolutionScale {
+    $scale = Setting "resolution" "260"
+    if ($resolutionScales -contains $scale) { return $scale }
+    return "260"
+}
+function Get-EyeSize([string]$scale, [bool]$pro) {
+    $percent = $(if ($scale -eq "game") { $(if ($pro) { 180 } else { 145 }) } else { [int]$scale })
+    return ([string][math]::Round(960 * $percent / 100) + "x" + [string][math]::Round(1080 * $percent / 100))
+}
+
+function Set-EngineSettings([string]$gameFolder, [string]$rate, [string]$scale, [bool]$pro) {
     $folder = [System.IO.Path]::Combine($gameFolder, "deadlock", "saved", "config", "ps4")
     $file = Join-Path $folder "engine.ini"
     if ([System.IO.File]::Exists($file)) {
         $first = @(Get-Content -LiteralPath $file -TotalCount 1)
         if ($first.Count -eq 0 -or -not $first[0].StartsWith($frameRateMark)) {
-            Say ("The game's folder has engine settings of its own, which decide its frame rate: " + $file) "Yellow"
+            Say ("The game's folder has engine settings of its own, which decide its frame rate and sharpness: " + $file) "Yellow"
             return
         }
     }
     try {
-        if ($rate -eq "60") {
+        $morpheus = @()
+        if ($rate -ne "60") {
+            $morpheus += "PSVRFrameSequence=" + $(if ($rate -eq "90") { "Render90Scanout90" } else { "Render120Scanout120" })
+        }
+        if ($scale -ne "game") {
+            # Both are read once the override is on: the mode not played keeps its own.
+            $morpheus += "bOverrideScreenPercentage=True"
+            $morpheus += "ScreenPercentage=" + $(if ($pro) { "145" } else { $scale })
+            $morpheus += "ScreenPercentageNeo=" + $(if ($pro) { $scale } else { "180" })
+        }
+        if ($morpheus.Count -eq 0) {
             if ([System.IO.File]::Exists($file)) { [System.IO.File]::Delete($file) }
             # (The folders go too where they are empty: the launcher made them.)
             foreach ($path in @($folder, (Split-Path $folder), (Split-Path (Split-Path $folder)))) {
@@ -181,22 +206,22 @@ function Set-FrameRate([string]$gameFolder, [string]$rate) {
             }
             return
         }
-        $sequence = $(if ($rate -eq "90") { "Render90Scanout90" } else { "Render120Scanout120" })
+        $lines = @(("$frameRateMark for $rate fps, sharpness " + $(if ($scale -eq "game") { "the game's own" } else { "$scale%" }) + "; 60 fps with the game's own sharpness removes it."),
+                   "[/Script/MorpheusEditor.MorpheusRuntimeSettings]") + $morpheus
+        if ($rate -ne "60") {
+            # The game's engine also holds it to 62 frames a second unless told otherwise.
+            $lines += @("",
+                "[/Script/Engine.Engine]",
+                "bSmoothFrameRate=False",
+                "SmoothedFrameRateRange=(LowerBound=(Type=Inclusive,Value=22),UpperBound=(Type=Exclusive,Value=250))",
+                "",
+                "[SystemSettings]",
+                "t.MaxFPS=0")
+        }
         [void][System.IO.Directory]::CreateDirectory($folder)
-        # The game's engine also holds it to 62 frames a second unless told otherwise.
-        [System.IO.File]::WriteAllLines($file, [string[]]@(
-            "$frameRateMark for $rate fps; choosing 60 fps there removes it.",
-            "[/Script/MorpheusEditor.MorpheusRuntimeSettings]",
-            "PSVRFrameSequence=$sequence",
-            "",
-            "[/Script/Engine.Engine]",
-            "bSmoothFrameRate=False",
-            "SmoothedFrameRateRange=(LowerBound=(Type=Inclusive,Value=22),UpperBound=(Type=Exclusive,Value=250))",
-            "",
-            "[SystemSettings]",
-            "t.MaxFPS=0"))
+        [System.IO.File]::WriteAllLines($file, [string[]]$lines)
     } catch {
-        Say ("The frame rate could not be set in the game's folder: " + $_.Exception.Message) "Yellow"
+        Say ("The frame rate and sharpness could not be set in the game's folder: " + $_.Exception.Message) "Yellow"
     }
 }
 
@@ -624,7 +649,7 @@ function Show-Menu {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "Statik VR"
-    $form.ClientSize = New-Object System.Drawing.Size(560, 394)
+    $form.ClientSize = New-Object System.Drawing.Size(560, 516)
     $form.StartPosition = "CenterScreen"
     $form.FormBorderStyle = "FixedDialog"
     $form.MaximizeBox = $false
@@ -669,11 +694,11 @@ function Show-Menu {
     $y += 22
     $fov = New-Object System.Windows.Forms.TrackBar
     $fov.Minimum = 14
-    $fov.Maximum = 20
+    $fov.Maximum = 24
     $fov.TickFrequency = 1
     $fov.LargeChange = 1
     $fov.SetBounds(12, $y, 300, 40)
-    $fov.Value = [math]::Max(14, [math]::Min(20, [int]([int](Setting "fov" "100") / 5)))
+    $fov.Value = [math]::Max(14, [math]::Min(24, [int]([int](Setting "fov" "110") / 5)))
     $form.Controls.Add($fov)
     $fovText = New-Object System.Windows.Forms.Label
     $fovText.SetBounds(316, $y + 4, 230, 40)
@@ -683,6 +708,8 @@ function Show-Menu {
         $percent = $fov.Value * 5
         if ($percent -eq 100) {
             $fovText.Text = $(if ($ofPsvr) { "100%: PlayStation VR's own" } else { "100%: all that the headset shows" })
+        } elseif ($percent -gt 100) {
+            $fovText.Text = "$percent%: wider, a little less sharp"
         } else {
             $fovText.Text = "$percent% of it: sharper, with a dark border"
         }
@@ -745,7 +772,55 @@ function Show-Menu {
     $pro.Checked = (Setting "pro" "1") -ne "0"
     $pro.SetBounds(16, $y, 528, 24)
     $form.Controls.Add($pro)
-    $y += 32
+    $y += 30
+
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = "Sharpness (per-eye resolution)"
+    $label.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+    $label.SetBounds(16, $y, 520, 20)
+    $form.Controls.Add($label)
+    $y += 22
+    $resolution = New-Object System.Windows.Forms.ComboBox
+    $resolution.Name = "resolution"
+    $resolution.DropDownStyle = "DropDownList"
+    $resolution.Items.AddRange(@($resolutionScales | ForEach-Object {
+        if ($_ -eq "game") { "The game's own" } elseif ($_ -eq "260") { "260% (default)" } else { "$_%" }
+    }))
+    $resolution.SelectedIndex = [array]::IndexOf($resolutionScales, (Get-ResolutionScale))
+    $resolution.SetBounds(16, $y, 248, 26)
+    $form.Controls.Add($resolution)
+    $resolutionText = New-Object System.Windows.Forms.Label
+    $resolutionText.SetBounds(284, $y + 4, 260, 20)
+    $form.Controls.Add($resolutionText)
+    $updateResolution = {
+        $resolutionText.Text = (Get-EyeSize $resolutionScales[$resolution.SelectedIndex] $pro.Checked) + " an eye; needs a fast GPU"
+    }
+    $resolution.Add_SelectedIndexChanged($updateResolution)
+    $pro.Add_CheckedChanged($updateResolution)
+    & $updateResolution
+    $y += 36
+
+    $twoHands = New-Object System.Windows.Forms.CheckBox
+    $twoHands.Name = "twoHands"
+    $twoHands.Text = "Hold the box with both motion controllers"
+    $twoHands.Checked = (Setting "two_hands" "1") -ne "0"
+    $twoHands.SetBounds(16, $y, 528, 24)
+    $form.Controls.Add($twoHands)
+    $y += 30
+
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = "Motion controllers' right stick:"
+    $label.SetBounds(16, $y + 3, 200, 20)
+    $form.Controls.Add($label)
+    $rightStick = New-Object System.Windows.Forms.ComboBox
+    $rightStick.Name = "rightStick"
+    $rightStick.DropDownStyle = "DropDownList"
+    $rightStickModes = @("both", "stick", "touchpad")
+    $rightStick.Items.AddRange(@("Right stick and touchpad finger", "Right stick only", "Touchpad finger only"))
+    $rightStick.SelectedIndex = [math]::Max(0, [array]::IndexOf($rightStickModes, (Setting "right_stick" "both")))
+    $rightStick.SetBounds(216, $y, 328, 26)
+    $form.Controls.Add($rightStick)
+    $y += 36
 
     $again = New-Object System.Windows.Forms.CheckBox
     $again.Text = "Show this window at every start"
@@ -786,6 +861,9 @@ function Show-Menu {
     Save-Setting "desktop_crop" ($(if ($desktopCrop.Checked) { "1" } else { "0" }))
     Save-Setting "pro" ($(if ($pro.Checked) { "1" } else { "0" }))
     Save-Setting "frame_rate" $frameRates[$frameRate.SelectedIndex]
+    Save-Setting "resolution" $resolutionScales[$resolution.SelectedIndex]
+    Save-Setting "two_hands" ($(if ($twoHands.Checked) { "1" } else { "0" }))
+    Save-Setting "right_stick" $rightStickModes[$rightStick.SelectedIndex]
     Read-Settings
     return $true
 }
@@ -865,7 +943,7 @@ if ((Setting "predict_ms") -ne "") { $env:SHADPS4_XR_PREDICT_MS = Setting "predi
 if ((Setting "stick_touchpad" "1") -eq "0") { $env:SHADPS4_STICK_TOUCHPAD = "0" }
 if ((Setting "mic_gain") -ne "") { $env:SHADPS4_MIC_GAIN = Setting "mic_gain" }
 if ((Setting "surround" "1") -eq "0") { $env:SHADPS4_VIRTUAL_SURROUND = "0" }
-$fovSetting = Setting "fov" "100"
+$fovSetting = Setting "fov" "110"
 if ($fovSetting -ne "100") { $env:SHADPS4_VR_FOV = $fovSetting }
 # fov_of: what fov is a percent of. headset: what the headset being worn shows, all of it at 100
 # (the emulator asks the headset as it starts). psvr: a PlayStation VR's, as the game was made.
@@ -874,6 +952,10 @@ if ((Setting "headset" "1") -eq "0") { $env:SHADPS4_OPENXR = "0" }
 if ((Setting "pause" "1") -eq "0") { $env:SHADPS4_XR_PAUSE = "0" }
 if ((Setting "controllers" "1") -eq "0") { $env:SHADPS4_XR_CONTROLLERS = "0" }
 if ((Setting "controller_hand" "right") -eq "left") { $env:SHADPS4_XR_PAD_HAND = "left" }
+$env:SHADPS4_XR_RIGHT_STICK = Setting "right_stick" "both"
+$env:SHADPS4_XR_TWO_HANDS = $(if ((Setting "two_hands" "1") -ne "0") { "1" } else { "0" })
+$env:SHADPS4_XR_BOX_DEPTH = Setting "box_depth" "8"
+if ((Setting "box_steady") -ne "") { $env:SHADPS4_XR_BOX_STEADY = Setting "box_steady" }
 $env:SHADPS4_XR_WAIT = Setting "wait" "60"
 $env:SHADPS4_CONSOLE_LANGUAGE = Get-GameLanguage
 $env:SHADPS4_NEO_MODE = $(if ((Setting "pro" "1") -ne "0") { "1" } else { "0" })
@@ -883,7 +965,9 @@ foreach ($pair in $extraEnv) {
     if ($at -ge 1) { Set-Item -Path ("Env:" + $pair.Substring(0, $at)) -Value $pair.Substring($at + 1) }
 }
 $frameRateChosen = Get-FrameRate
-Set-FrameRate $gameFolder $frameRateChosen
+$resolutionChosen = Get-ResolutionScale
+$proChosen = (Setting "pro" "1") -ne "0"
+Set-EngineSettings $gameFolder $frameRateChosen $resolutionChosen $proChosen
 
 # --- what is there ----------------------------------------------------------------------------
 Say "Statik: Institute of Retention - PC VR" "Cyan"
@@ -918,6 +1002,7 @@ if ($env:SHADPS4_OPENXR -ne "0" -and [int]$env:SHADPS4_XR_WAIT -gt 0) {
     Say ("The game waits up to " + $env:SHADPS4_XR_WAIT + " seconds for the headset before it starts on the monitor.")
 }
 Say ("Frame rate: " + $frameRateChosen + " fps, with the headset at " + (Get-FrameRateRefresh $frameRateChosen) + " Hz.")
+Say ("Each eye drawn at " + (Get-EyeSize $resolutionChosen $proChosen) + $(if ($resolutionChosen -eq "game") { ", the game's own." } else { " (" + $resolutionChosen + "%)." }))
 Say "Hold OPTIONS for a second (or press the PS button) to reset the view."
 Say "Use Statik's in-game prompts for the puzzle controls. A PC-connected DualSense is recommended."
 Say "The right stick can stand in for a touchpad finger on controllers without a touchpad."

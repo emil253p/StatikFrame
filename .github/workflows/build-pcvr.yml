@@ -1,0 +1,75 @@
+# Builds the PC VR emulator (pc-vr/shadps4.exe) on Windows when started by hand, as described in
+# docs/BUILDING.md, and uploads it with the launcher files as a downloadable artifact.
+name: Build PC VR
+
+# Manual only: start it from the Actions tab (Build PC VR > Run workflow) when a version
+# is worth building. Pushes do not build.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pcvr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install LLVM
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "21.1.8"
+          directory: ${{ runner.temp }}/llvm
+
+      # Compiled files are kept between builds: a change to one file recompiles that file.
+      - name: Compile cache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Build
+        shell: pwsh
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          CMAKE_C_COMPILER_LAUNCHER: sccache
+          CMAKE_CXX_COMPILER_LAUNCHER: sccache
+        run: |
+          .\tools\build_pcvr_release.ps1 -LlvmDirectory "$env:LLVM_PATH\bin"
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update'
+          New-Item -ItemType Directory -Force -Path (Join-Path $out 'pc-vr') | Out-Null
+          Copy-Item build\pcvr_release\shadps4.exe (Join-Path $out 'pc-vr\shadps4.exe')
+          foreach ($name in @('launch.ps1', 'settings.txt', 'default_config.json', 'package_setup.ps1')) {
+            Copy-Item (Join-Path 'pc-vr' $name) (Join-Path $out "pc-vr\$name")
+          }
+          Copy-Item 'Play Statik VR.bat', 'README-PC-VR.md' $out
+          "Copy these over your StatikQuest folder. Your settings.local.txt, saves and game stay as they are." |
+            Set-Content (Join-Path $out 'HOW-TO-UPDATE.txt')
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StatikQuest-PC-VR-update
+          path: ${{ runner.temp }}/StatikQuest-PC-VR-update
+
+      # The newest build of every branch, as a public download (no GitHub sign-in needed).
+      - name: Publish test build
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update.zip'
+          Compress-Archive -Path (Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update\*') -DestinationPath $zip
+          gh release delete test-build --yes --cleanup-tag 2>$null
+          $global:LASTEXITCODE = 0
+          gh release create test-build $zip --prerelease --target $env:GITHUB_SHA `
+            --title "Test build ($($env:GITHUB_SHA.Substring(0, 7)))" `
+            --notes "Built from $env:GITHUB_REF_NAME at $env:GITHUB_SHA."

@@ -2,8 +2,8 @@
 # Start Play Statik VR.bat. One key=value per line; # starts a comment.
 menu=1
 language=windows
-# Shared VR FOV: 70..100 percent of psvr or headset. PSVR is the tested default.
-fov=100
+# Shared VR FOV: 70..120 percent of psvr or headset. Over 100 is wider than PSVR's own.
+fov=110
 fov_of=psvr
 # Desktop view: stereo, spectator (one eye), or combined.
 desktop_view=stereo
@@ -12,6 +12,17 @@ desktop_crop=0
 pro=1
 # Frame rate: 90 fps (headset at 90 Hz), 120 fps (headset at 120 Hz), or 60 fps as on PSVR (headset at 120 Hz).
 frame_rate=90
+# Per-eye sharpness, as a percentage of the 960x1080 PSVR panel: game (145% base PS4, 180% Pro),
+# 200, 220, 240, 260 (2496x2808 an eye on a PS4 Pro), 280 or 300 (2880x3240). Higher needs a faster GPU.
+resolution=260
+# Both motion controllers hold the game's controller together (1), or only one (0).
+two_hands=1
+# Centimetres the box held in both hands sits towards you from the controllers (0 = at their tips).
+box_depth=8
+# Hands closer than the first number (cm) turn the box by the wrists alone, farther than the second by the line between them.
+#box_steady=10,30
+# Motion controllers' right stick: both (right stick and touchpad finger), stick, or touchpad.
+right_stick=both
 sharpen=0.3
 # Connect the DualSense to the PC, not the headset.
 #hands=1
@@ -28,4 +39,3 @@ sharpen=0.3
 #game=C:\path\to\CUSA06929\eboot.bin
 # Optional developer diagnostics:
 #env=SHADPS4_SHOT_SECONDS=20
-# No resolution/fps overrides: the upstream controls patched Astro Bot, not Statik.
