@@ -649,7 +649,7 @@ function Show-Menu {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "Statik VR"
-    $form.ClientSize = New-Object System.Drawing.Size(560, 482)
+    $form.ClientSize = New-Object System.Drawing.Size(560, 516)
     $form.StartPosition = "CenterScreen"
     $form.FormBorderStyle = "FixedDialog"
     $form.MaximizeBox = $false
@@ -804,7 +804,21 @@ function Show-Menu {
     $twoHands.Checked = (Setting "two_hands" "1") -ne "0"
     $twoHands.SetBounds(16, $y, 528, 24)
     $form.Controls.Add($twoHands)
-    $y += 32
+    $y += 30
+
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = "Motion controllers' right stick:"
+    $label.SetBounds(16, $y + 3, 200, 20)
+    $form.Controls.Add($label)
+    $rightStick = New-Object System.Windows.Forms.ComboBox
+    $rightStick.Name = "rightStick"
+    $rightStick.DropDownStyle = "DropDownList"
+    $rightStickModes = @("both", "stick", "touchpad")
+    $rightStick.Items.AddRange(@("Right stick and touchpad finger", "Right stick only", "Touchpad finger only"))
+    $rightStick.SelectedIndex = [math]::Max(0, [array]::IndexOf($rightStickModes, (Setting "right_stick" "both")))
+    $rightStick.SetBounds(216, $y, 328, 26)
+    $form.Controls.Add($rightStick)
+    $y += 36
 
     $again = New-Object System.Windows.Forms.CheckBox
     $again.Text = "Show this window at every start"
@@ -847,6 +861,7 @@ function Show-Menu {
     Save-Setting "frame_rate" $frameRates[$frameRate.SelectedIndex]
     Save-Setting "resolution" $resolutionScales[$resolution.SelectedIndex]
     Save-Setting "two_hands" ($(if ($twoHands.Checked) { "1" } else { "0" }))
+    Save-Setting "right_stick" $rightStickModes[$rightStick.SelectedIndex]
     Read-Settings
     return $true
 }
@@ -935,6 +950,7 @@ if ((Setting "headset" "1") -eq "0") { $env:SHADPS4_OPENXR = "0" }
 if ((Setting "pause" "1") -eq "0") { $env:SHADPS4_XR_PAUSE = "0" }
 if ((Setting "controllers" "1") -eq "0") { $env:SHADPS4_XR_CONTROLLERS = "0" }
 if ((Setting "controller_hand" "right") -eq "left") { $env:SHADPS4_XR_PAD_HAND = "left" }
+$env:SHADPS4_XR_RIGHT_STICK = Setting "right_stick" "both"
 $env:SHADPS4_XR_TWO_HANDS = $(if ((Setting "two_hands" "1") -ne "0") { "1" } else { "0" })
 $env:SHADPS4_XR_WAIT = Setting "wait" "60"
 $env:SHADPS4_CONSOLE_LANGUAGE = Get-GameLanguage

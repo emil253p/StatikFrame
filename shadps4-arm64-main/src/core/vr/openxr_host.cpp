@@ -467,6 +467,9 @@ struct OpenXrHost::Impl {
     XrAction act_aims{XR_NULL_HANDLE};
     XrSpace aim_spaces[2]{XR_NULL_HANDLE, XR_NULL_HANDLE};
     bool two_hands{true};
+    // What the right stick is to the game: a finger on the touchpad, its right stick, or both.
+    bool right_stick_finger{true};
+    bool right_stick_stick{true};
     bool two_hands_held{};
     XrQuaternionf two_hands_turn{0.0f, 0.0f, 0.0f, 1.0f};
     XrTime two_hands_time{};
@@ -1254,6 +1257,11 @@ struct OpenXrHost::Impl {
         return true;
     }
 
+    /// The other hand's grip held: the right stick turns the view (see UpdateControllers).
+    bool turning_now(float left_grip, float right_grip) const {
+        return (pad_hand == 0 ? right_grip : left_grip) > 0.5f;
+    }
+
     /// For the log: which of the controllers' bindings the runtime uses for each hand.
     void LogInteractionProfiles() {
         if (session == XR_NULL_HANDLE) {
@@ -1541,8 +1549,14 @@ struct OpenXrHost::Impl {
             return value < 0.12f ? 0 : static_cast<int>(std::lround(value * 255.0f));
         };
         // A stick pushed away from the player says +1 here, and 0 on a gamepad.
+        const bool as_stick = right_stick_stick && !turning_now(left_grip, right_grip);
         const std::array<int, 6> axes{
-            axis(move.x), axis(-move.y), 128, 128, trigger(left_trigger), trigger(right_trigger),
+            axis(move.x),
+            axis(-move.y),
+            as_stick ? axis(finger.x) : 128,
+            as_stick ? axis(-finger.y) : 128,
+            trigger(left_trigger),
+            trigger(right_trigger),
         };
         // (The trigger buttons follow from the axes where they are applied.)
         if (axes[4] > 0) {
@@ -1579,7 +1593,7 @@ struct OpenXrHost::Impl {
             if (made.pressed) {
                 buttons |= Buttons::TouchPad;
             }
-        } else if (turning) {
+        } else if (turning || !right_stick_finger) {
             stick_finger.Reset();
         } else {
             dragged = stick_finger.Update(seconds, finger.x, -finger.y);
@@ -2953,6 +2967,13 @@ bool OpenXrHost::Connect() {
     // SHADPS4_XR_TWO_HANDS=0: one controller (SHADPS4_XR_PAD_HAND) holds the game's
     // controller, not both together.
     impl->two_hands = EnvFlag("SHADPS4_XR_TWO_HANDS", true);
+    // SHADPS4_XR_RIGHT_STICK=touchpad, stick or both (the default): what the headset
+    // controllers' right stick is to the game.
+    if (const char* right = std::getenv("SHADPS4_XR_RIGHT_STICK"); right != nullptr) {
+        const std::string_view mode{right};
+        impl->right_stick_finger = mode != "stick";
+        impl->right_stick_stick = mode != "touchpad";
+    }
     if (const char* hand = std::getenv("SHADPS4_XR_PAD_HAND"); hand != nullptr) {
         impl->pad_hand = hand[0] == 'l' || hand[0] == 'L' ? 0 : 1;
     }

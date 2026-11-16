@@ -6,6 +6,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: pcvr-${{ github.ref }}
   cancel-in-progress: true
@@ -25,8 +28,16 @@ jobs:
           version: "21.1.8"
           directory: ${{ runner.temp }}/llvm
 
+      # Compiled files are kept between builds: a change to one file recompiles that file.
+      - name: Compile cache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
       - name: Build
         shell: pwsh
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          CMAKE_C_COMPILER_LAUNCHER: sccache
+          CMAKE_CXX_COMPILER_LAUNCHER: sccache
         run: |
           .\tools\build_pcvr_release.ps1 -LlvmDirectory "$env:LLVM_PATH\bin"
 
@@ -47,3 +58,17 @@ jobs:
         with:
           name: StatikQuest-PC-VR-update
           path: ${{ runner.temp }}/StatikQuest-PC-VR-update
+
+      # The newest build of every branch, as a public download (no GitHub sign-in needed).
+      - name: Publish test build
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update.zip'
+          Compress-Archive -Path (Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update\*') -DestinationPath $zip
+          gh release delete test-build --yes --cleanup-tag 2>$null
+          $global:LASTEXITCODE = 0
+          gh release create test-build $zip --prerelease --target $env:GITHUB_SHA `
+            --title "Test build ($($env:GITHUB_SHA.Substring(0, 7)))" `
+            --notes "Built from $env:GITHUB_REF_NAME at $env:GITHUB_SHA."

@@ -17,6 +17,8 @@ frame_rate=90
 resolution=260
 # Both motion controllers hold the game's controller together (1), or only one (0).
 two_hands=1
+# Motion controllers' right stick: both (right stick and touchpad finger), stick, or touchpad.
+right_stick=both
 sharpen=0.3
 # Connect the DualSense to the PC, not the headset.
 #hands=1

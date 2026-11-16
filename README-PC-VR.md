@@ -23,7 +23,8 @@ and puzzle interactions still need verification in Statik.
 Steam Frame controllers get their own bindings on SteamVR: right A ✕, B ○,
 X □, Y △ (B and Y together blow), the left D-pad is the D-pad, View or Menu is
 OPTIONS, bumpers and grips are L1/R1, triggers L2/R2. As with other controllers,
-the right stick moves a finger on the touchpad and pressing it presses the pad.
+the right stick is both the PS4 right stick and a finger on the touchpad
+(`right_stick=stick` or `touchpad` for just one), and pressing it presses the pad.
 
 ## Game
 
