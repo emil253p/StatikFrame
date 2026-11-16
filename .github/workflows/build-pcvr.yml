@@ -1,0 +1,49 @@
+# Builds the PC VR emulator (pc-vr/shadps4.exe) on Windows for every push, as described in
+# docs/BUILDING.md, and uploads it with the launcher files as a downloadable artifact.
+name: Build PC VR
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: pcvr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install LLVM
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "21.1.8"
+          directory: ${{ runner.temp }}/llvm
+
+      - name: Build
+        shell: pwsh
+        run: |
+          .\tools\build_pcvr_release.ps1 -LlvmDirectory "$env:LLVM_PATH\bin"
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update'
+          New-Item -ItemType Directory -Force -Path (Join-Path $out 'pc-vr') | Out-Null
+          Copy-Item build\pcvr_release\shadps4.exe (Join-Path $out 'pc-vr\shadps4.exe')
+          foreach ($name in @('launch.ps1', 'settings.txt', 'default_config.json', 'package_setup.ps1')) {
+            Copy-Item (Join-Path 'pc-vr' $name) (Join-Path $out "pc-vr\$name")
+          }
+          Copy-Item 'Play Statik VR.bat', 'README-PC-VR.md' $out
+          "Copy these over your StatikQuest folder. Your settings.local.txt, saves and game stay as they are." |
+            Set-Content (Join-Path $out 'HOW-TO-UPDATE.txt')
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StatikQuest-PC-VR-update
+          path: ${{ runner.temp }}/StatikQuest-PC-VR-update

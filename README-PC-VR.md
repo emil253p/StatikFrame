@@ -20,6 +20,11 @@ place the gamepad; without tracked position, shared VR code provides a fixed
 position. VR-controller replacement, positional tracking, recenter shortcuts
 and puzzle interactions still need verification in Statik.
 
+Steam Frame controllers get their own bindings on SteamVR: right A ✕, B ○,
+X □, Y △ (B and Y together blow), the left D-pad is the D-pad, View or Menu is
+OPTIONS, bumpers and grips are L1/R1, triggers L2/R2. As with other controllers,
+the right stick moves a finger on the touchpad and pressing it presses the pad.
+
 ## Game
 
 Use the CUSA06929 European **base game**: its extracted `eboot.bin`, its folder,
@@ -54,9 +59,21 @@ installation paths short.
   in the game's folder; choosing 60 fps removes it. 120 fps needs a fast PC.
 - **Show this window at every start**: untick to skip the menu next time.
 
-There is no resolution slider. Upstream's resolution and frame-rate controls
-patched Astro Bot and cannot override Statik. Old `resolution`, `fps`,
-`dynamic`, `pace` and `real_time` settings are not applied.
+- **Sharpness**: the game's own, 220% or 260% (default). Statik's PSVR settings
+  draw each eye at a percentage of the 960×1080 panel: 145% on a base PS4, 180%
+  on a PS4 Pro. 260% is 2496×2808 an eye in Pro mode. The launcher writes it to
+  the same `engine.ini` (`bOverrideScreenPercentage`, `ScreenPercentage`,
+  `ScreenPercentageNeo`). The emulator log states the size the game actually
+  draws (`The title's first picture handed to the headset`).
+- **Hold the box with both motion controllers**: on by default. With both
+  controllers tracked, the game's controller is halfway between them; raising or
+  pushing one hand tilts and turns it like a steering wheel, and tipping both
+  wrists tips it. With one controller untracked, or the hands together or far
+  apart, the chosen hand holds it alone (`two_hands=0` always does).
+
+Upstream's resolution and frame-rate controls patched Astro Bot and cannot
+override Statik. Old `fps`, `dynamic`, `pace` and `real_time` settings are not
+applied.
 
 Defaults are in `pc-vr/settings.txt`; your choices and game path are saved in
 ignored `pc-vr/settings.local.txt`, leaving the tracked template unchanged.

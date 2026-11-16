@@ -12,6 +12,11 @@ desktop_crop=0
 pro=1
 # Frame rate: 90 fps (headset at 90 Hz), 120 fps (headset at 120 Hz), or 60 fps as on PSVR (headset at 120 Hz).
 frame_rate=90
+# Per-eye sharpness, as a percentage of the 960x1080 PSVR panel: game (145% base PS4, 180% Pro),
+# 220, or 260 (2496x2808 an eye on a PS4 Pro). Higher needs a faster GPU.
+resolution=260
+# Both motion controllers hold the game's controller together (1), or only one (0).
+two_hands=1
 sharpen=0.3
 # Connect the DualSense to the PC, not the headset.
 #hands=1
@@ -28,4 +33,3 @@ sharpen=0.3
 #game=C:\path\to\CUSA06929\eboot.bin
 # Optional developer diagnostics:
 #env=SHADPS4_SHOT_SECONDS=20
-# No resolution/fps overrides: the upstream controls patched Astro Bot, not Statik.
