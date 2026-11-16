@@ -70,6 +70,12 @@ jobs:
           Compress-Archive -Path (Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update\*') -DestinationPath $zip
           gh release delete test-build --yes --cleanup-tag 2>$null
           $global:LASTEXITCODE = 0
+          # The player guide in docs/TEST-BUILD-NOTES.md, then where this build came from.
+          $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          $guide = 'docs/TEST-BUILD-NOTES.md'
+          $text = if (Test-Path $guide) { (Get-Content -Raw -Encoding utf8 $guide).TrimEnd() + "`n`n---`n" } else { '' }
+          $text += "Built from $env:GITHUB_REF_NAME at $env:GITHUB_SHA."
+          Set-Content -Encoding utf8 -NoNewline -Path $notes -Value $text
           gh release create test-build $zip --prerelease --target $env:GITHUB_SHA `
             --title "Test build ($($env:GITHUB_SHA.Substring(0, 7)))" `
-            --notes "Built from $env:GITHUB_REF_NAME at $env:GITHUB_SHA."
+            --notes-file $notes

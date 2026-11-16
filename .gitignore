@@ -17,6 +17,7 @@
 !/docs/
 /docs/*
 !/docs/BUILDING.md
+!/docs/TEST-BUILD-NOTES.md
 !/docs/images/
 /docs/images/*
 !/docs/images/statik-gameplay.png
