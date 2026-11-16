@@ -21,4 +21,4 @@ Add these lines to `pc-vr\settings.local.txt`:
 In SteamVR's controller bindings for **StatikQuest**, pick the default bindings.
 
 ### Thanks
-StatikFrame is a fork of [Jerware/StatikQuest](https://github.com/Jerware/StatikQuest), built on [AstroQuest](https://github.com/bigmak94/AstroQuest), [shadPS4](https://github.com/shadps4-emu/shadPS4) and [shadps4-arm64](https://github.com/zenithblue-oss/shadps4-arm64). All the credit for Statik in VR goes to them; see the [README](https://github.com/emil253p/statikquest#thanks) for everyone involved.
+StatikFrame is a fork of [Jerware/StatikQuest](https://github.com/Jerware/StatikQuest), built on [AstroQuest](https://github.com/bigmak94/AstroQuest), [shadPS4](https://github.com/shadps4-emu/shadPS4) and [shadps4-arm64](https://github.com/zenithblue-oss/shadps4-arm64). All the credit for Statik in VR goes to them; see the [README](https://github.com/emil253p/StatikFrame#thanks) for everyone involved.

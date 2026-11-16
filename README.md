@@ -31,7 +31,7 @@ Work in progress. Most levels have been tested, but not all. The current Windows
 
 ## Installing: PC VR through Virtual Desktop
 
-Download the Windows PC ZIP from the [latest release](https://github.com/emil253p/statikquest/releases/latest) and unzip it. There is no standalone Quest APK.
+Download the Windows PC ZIP from the [latest release](https://github.com/emil253p/StatikFrame/releases/latest) and unzip it. There is no standalone Quest APK.
 
 A source checkout does not include the emulator executable: follow [Building from source](#building-from-source) first. With a prepared PC build, keep the whole folder together, then:
 
@@ -68,7 +68,7 @@ All settings and what to do when something does not work are in [README-PC-VR.md
 Clone with the submodules:
 
 ```sh
-git clone --recurse-submodules https://github.com/emil253p/statikquest.git
+git clone --recurse-submodules https://github.com/emil253p/StatikFrame.git
 ```
 
 The PC build uses Visual Studio C++ Build Tools with a Windows SDK and CMake/Ninja, plus LLVM (`clang-cl`, `llvm-lib` and `llvm-rc`). LLVM 21.1.8 was used locally. No Sony SDK is required.
