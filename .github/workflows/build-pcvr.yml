@@ -1,9 +1,10 @@
-# Builds the PC VR emulator (pc-vr/shadps4.exe) on Windows for every push, as described in
+# Builds the PC VR emulator (pc-vr/shadps4.exe) on Windows when started by hand, as described in
 # docs/BUILDING.md, and uploads it with the launcher files as a downloadable artifact.
 name: Build PC VR
 
+# Manual only: start it from the Actions tab (Build PC VR > Run workflow) when a version
+# is worth building. Pushes do not build.
 on:
-  push:
   workflow_dispatch:
 
 permissions:
