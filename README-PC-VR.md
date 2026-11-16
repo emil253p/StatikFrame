@@ -60,9 +60,10 @@ installation paths short.
   in the game's folder; choosing 60 fps removes it. 120 fps needs a fast PC.
 - **Show this window at every start**: untick to skip the menu next time.
 
-- **Sharpness**: the game's own, 220% or 260% (default). Statik's PSVR settings
-  draw each eye at a percentage of the 960×1080 panel: 145% on a base PS4, 180%
-  on a PS4 Pro. 260% is 2496×2808 an eye in Pro mode. The launcher writes it to
+- **Sharpness**: the game's own, or 200% to 300% in steps of 20% (260% is the
+  default). Statik's PSVR settings draw each eye at a percentage of the 960×1080
+  panel: 145% on a base PS4, 180% on a PS4 Pro. 260% is 2496×2808 an eye in Pro
+  mode, 300% is 2880×3240. The launcher writes it to
   the same `engine.ini` (`bOverrideScreenPercentage`, `ScreenPercentage`,
   `ScreenPercentageNeo`). The emulator log states the size the game actually
   draws (`The title's first picture handed to the headset`).
@@ -71,6 +72,12 @@ installation paths short.
   pushing one hand tilts and turns it like a steering wheel, and tipping both
   wrists tips it. With one controller untracked, or the hands together or far
   apart, the chosen hand holds it alone (`two_hands=0` always does).
+  `box_depth` (default 8) sets how many centimetres the box sits towards you from
+  the controllers, so the hands are inside it and it turns about them rather
+  than about its opening; 0 puts it at the controllers' tips. With the hands
+  close together the box's tilt and turn come from the wrists rather than the
+  line between the hands, which would swing fast; `box_steady=10,30` (cm) is
+  where it is the wrists alone and where it is the line alone.
 
 Upstream's resolution and frame-rate controls patched Astro Bot and cannot
 override Statik. Old `fps`, `dynamic`, `pace` and `real_time` settings are not

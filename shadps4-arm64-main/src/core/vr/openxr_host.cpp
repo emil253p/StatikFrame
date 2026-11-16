@@ -467,6 +467,13 @@ struct OpenXrHost::Impl {
     XrAction act_aims{XR_NULL_HANDLE};
     XrSpace aim_spaces[2]{XR_NULL_HANDLE, XR_NULL_HANDLE};
     bool two_hands{true};
+    // Metres the game's controller sits towards the player from the two controllers when
+    // both hold it, so the hands are inside the box rather than at its opening.
+    float two_hands_depth{0.08f};
+    // Hands closer than near: the box's sideways axis is the wrists'; farther than far: the
+    // line between the hands; in between, a mix (metres).
+    float two_hands_steady_near{0.10f};
+    float two_hands_steady_far{0.30f};
     // What the right stick is to the game: a finger on the touchpad, its right stick, or both.
     bool right_stick_finger{true};
     bool right_stick_stick{true};
@@ -1194,6 +1201,32 @@ struct OpenXrHost::Impl {
             return false;
         }
         across = {across.x / apart, across.y / apart, across.z / apart};
+        // Close together, a centimetre's wobble of one hand swings the line between them by
+        // several degrees, so the box would turn too fast: there, its sideways axis comes
+        // more and more from the two wrists' own sideways axes, which are as steady at any
+        // distance (by default only the wrists below 10 cm apart, only the line between the
+        // hands from 30 cm, a smooth mix in between).
+        const XrVector3f side_left = Rotate(poses[0].orientation, {1.0f, 0.0f, 0.0f});
+        const XrVector3f side_right = Rotate(poses[1].orientation, {1.0f, 0.0f, 0.0f});
+        XrVector3f wrists{side_left.x + side_right.x, side_left.y + side_right.y,
+                          side_left.z + side_right.z};
+        const float wrists_length = Length(wrists);
+        if (wrists_length > 0.5f && two_hands_steady_far > two_hands_steady_near) {
+            wrists = {wrists.x / wrists_length, wrists.y / wrists_length,
+                      wrists.z / wrists_length};
+            float line = (apart - two_hands_steady_near) /
+                         (two_hands_steady_far - two_hands_steady_near);
+            line = line < 0.0f ? 0.0f : (line > 1.0f ? 1.0f : line);
+            line = line * line * (3.0f - 2.0f * line);
+            const XrVector3f mixed{across.x * line + wrists.x * (1.0f - line),
+                                   across.y * line + wrists.y * (1.0f - line),
+                                   across.z * line + wrists.z * (1.0f - line)};
+            const float mixed_length = Length(mixed);
+            if (mixed_length > 0.3f) {
+                across = {mixed.x / mixed_length, mixed.y / mixed_length,
+                          mixed.z / mixed_length};
+            }
+        }
         const XrVector3f up_left = Rotate(poses[0].orientation, {0.0f, 1.0f, 0.0f});
         const XrVector3f up_right = Rotate(poses[1].orientation, {0.0f, 1.0f, 0.0f});
         const XrVector3f up{up_left.x + up_right.x, up_left.y + up_right.y,
@@ -1211,8 +1244,11 @@ struct OpenXrHost::Impl {
         location.locationFlags = Needed | XR_SPACE_LOCATION_POSITION_TRACKED_BIT |
                                  XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT;
         location.pose.orientation = turn;
-        location.pose.position = {(left.x + right.x) * 0.5f, (left.y + right.y) * 0.5f,
-                                  (left.z + right.z) * 0.5f};
+        // Towards the player from between the hands: it turns about the hands inside it,
+        // not about its opening.
+        location.pose.position = {(left.x + right.x) * 0.5f + back.x * two_hands_depth,
+                                  (left.y + right.y) * 0.5f + back.y * two_hands_depth,
+                                  (left.z + right.z) * 0.5f + back.z * two_hands_depth};
         velocity.velocityFlags = 0;
         if (moving_count == 2) {
             velocity.linearVelocity = {(moving[0].x + moving[1].x) * 0.5f,
@@ -2970,6 +3006,18 @@ bool OpenXrHost::Connect() {
     // SHADPS4_XR_TWO_HANDS=0: one controller (SHADPS4_XR_PAD_HAND) holds the game's
     // controller, not both together.
     impl->two_hands = EnvFlag("SHADPS4_XR_TWO_HANDS", true);
+    // SHADPS4_XR_BOX_DEPTH: centimetres the box held in both hands sits towards the player
+    // from between the controllers (8 by default; 0 holds it at the controllers' tips).
+    impl->two_hands_depth = EnvFloat("SHADPS4_XR_BOX_DEPTH", 8.0f) * 0.01f;
+    // SHADPS4_XR_BOX_STEADY=near,far: centimetres apart below which the box's sideways
+    // axis comes from the wrists alone, and above which from the line between the hands.
+    if (const char* steady = std::getenv("SHADPS4_XR_BOX_STEADY"); steady != nullptr) {
+        float near_cm = 0.0f, far_cm = 0.0f;
+        if (std::sscanf(steady, "%f,%f", &near_cm, &far_cm) == 2) {
+            impl->two_hands_steady_near = near_cm * 0.01f;
+            impl->two_hands_steady_far = far_cm * 0.01f;
+        }
+    }
     // SHADPS4_XR_RIGHT_STICK=touchpad, stick or both (the default): what the headset
     // controllers' right stick is to the game.
     if (const char* right = std::getenv("SHADPS4_XR_RIGHT_STICK"); right != nullptr) {

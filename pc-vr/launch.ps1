@@ -164,7 +164,7 @@ function Get-FrameRateRefresh([string]$rate) {
 # How sharp the game draws, in the same file: Statik's PSVR settings give each eye a percentage
 # of the headset's 960x1080 panel, 145% on a base PS4 (1392x1566) and 180% on a PS4 Pro
 # (1728x1944). "game" leaves that as it is; a number is the percentage for the mode played.
-$resolutionScales = @("game", "220", "260")
+$resolutionScales = @("game", "200", "220", "240", "260", "280", "300")
 function Get-ResolutionScale {
     $scale = Setting "resolution" "260"
     if ($resolutionScales -contains $scale) { return $scale }
@@ -783,7 +783,9 @@ function Show-Menu {
     $resolution = New-Object System.Windows.Forms.ComboBox
     $resolution.Name = "resolution"
     $resolution.DropDownStyle = "DropDownList"
-    $resolution.Items.AddRange(@("The game's own", "220%", "260% (about 2500 wide)"))
+    $resolution.Items.AddRange(@($resolutionScales | ForEach-Object {
+        if ($_ -eq "game") { "The game's own" } elseif ($_ -eq "260") { "260% (default)" } else { "$_%" }
+    }))
     $resolution.SelectedIndex = [array]::IndexOf($resolutionScales, (Get-ResolutionScale))
     $resolution.SetBounds(16, $y, 248, 26)
     $form.Controls.Add($resolution)
@@ -952,6 +954,8 @@ if ((Setting "controllers" "1") -eq "0") { $env:SHADPS4_XR_CONTROLLERS = "0" }
 if ((Setting "controller_hand" "right") -eq "left") { $env:SHADPS4_XR_PAD_HAND = "left" }
 $env:SHADPS4_XR_RIGHT_STICK = Setting "right_stick" "both"
 $env:SHADPS4_XR_TWO_HANDS = $(if ((Setting "two_hands" "1") -ne "0") { "1" } else { "0" })
+$env:SHADPS4_XR_BOX_DEPTH = Setting "box_depth" "8"
+if ((Setting "box_steady") -ne "") { $env:SHADPS4_XR_BOX_STEADY = Setting "box_steady" }
 $env:SHADPS4_XR_WAIT = Setting "wait" "60"
 $env:SHADPS4_CONSOLE_LANGUAGE = Get-GameLanguage
 $env:SHADPS4_NEO_MODE = $(if ((Setting "pro" "1") -ne "0") { "1" } else { "0" })
