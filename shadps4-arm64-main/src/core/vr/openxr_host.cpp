@@ -1539,7 +1539,10 @@ struct OpenXrHost::Impl {
         }
         view_reset_held = view_reset;
         add(left_stick_in && !view_reset, Buttons::L3);
-        add(right_stick_in && !view_reset, Buttons::TouchPad);
+        // The right stick pressed in is R3 where it is the right stick, and presses the
+        // touchpad where it is the finger on it.
+        add(right_stick_in && !view_reset && right_stick_stick, Buttons::R3);
+        add(right_stick_in && !view_reset && right_stick_finger, Buttons::TouchPad);
 
         const auto axis = [](float value) {
             return std::clamp(static_cast<int>(std::lround(128.0f + value * 127.0f)), 0, 255);
@@ -1599,7 +1602,7 @@ struct OpenXrHost::Impl {
             dragged = stick_finger.Update(seconds, finger.x, -finger.y);
         }
         const bool swiping = made.down || dragged.down;
-        const bool touch = swiping || (right_stick_in && !view_reset);
+        const bool touch = swiping || (right_stick_in && !view_reset && right_stick_finger);
         const float touch_x = made.down ? made.x : dragged.down ? dragged.x : 0.5f;
         const float touch_y = made.down ? made.y : dragged.down ? dragged.y : 0.5f;
         if (buttons != sent_buttons || axes != sent_axes || touch != sent_touch ||
