@@ -6,7 +6,7 @@ $repo = Split-Path $PSScriptRoot
 if (-not $EmulatorPath) { $EmulatorPath = Join-Path $repo 'pc-vr\shadps4.exe' }
 if (-not $PkgToolDirectory) { $PkgToolDirectory = Join-Path $PSScriptRoot 'pkgtool' }
 $out = [IO.Path]::GetFullPath((Join-Path $repo "build\release\$Version"))
-$name = "StatikQuest-$Version-PC-VR-Windows"
+$name = "StatikFrame-$Version-PC-VR-Windows"
 $dest = Join-Path $out $name
 $zip = Join-Path $out ($name+'.zip')
 $checksums = Join-Path $out 'SHA256SUMS.txt'
@@ -14,7 +14,7 @@ if (Test-Path -LiteralPath $dest) { throw 'Staging folder already exists. Choose
 if (Test-Path -LiteralPath $zip) { throw 'Archive already exists. Choose another version; nothing will be overwritten.' }
 if (Test-Path -LiteralPath $checksums) { throw 'Checksum file already exists. Choose another version; nothing will be overwritten.' }
 if (-not (Test-Path -LiteralPath $EmulatorPath -PathType Leaf)) { throw 'Build/stage the emulator first.' }
-# The emulator names its build in every log ("StatikQuest build v0.4-0-g1234abc"): it has to be
+# The emulator names its build in every log ("StatikFrame build v0.4-0-g1234abc"): it has to be
 # built from a clean checkout at this version's tag, so that the name is the release's.
 $emulatorText = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($EmulatorPath))
 if ($emulatorText -notmatch ('v' + [regex]::Escape($Version) + '-0-g[0-9a-f]+\x00')) {

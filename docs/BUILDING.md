@@ -1,4 +1,4 @@
-# Building StatikQuest on Windows
+# Building StatikFrame on Windows
 
 These instructions build the PC VR emulator from source. The repository does
 not include an executable, game, decrypted system module or personal profile.

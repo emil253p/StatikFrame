@@ -15,7 +15,7 @@ function Get-ZipHash($entry) {
 $archive = [IO.Compression.ZipFile]::OpenRead([IO.Path]::GetFullPath($ArchivePath))
 try {
     $roots = @($archive.Entries | ForEach-Object { $_.FullName.Split('/')[0] } | Select-Object -Unique)
-    if ($roots.Count -ne 1 -or $roots[0] -notmatch '^StatikQuest-[A-Za-z0-9._-]+-PC-VR-Windows$') { throw 'Unexpected archive root.' }
+    if ($roots.Count -ne 1 -or $roots[0] -notmatch '^StatikFrame-[A-Za-z0-9._-]+-PC-VR-Windows$') { throw 'Unexpected archive root.' }
     $root = $roots[0] + '/'
     $allowed = @('LICENSE.txt','Play Statik VR.bat','README.txt','THIRD-PARTY-NOTICES.md',
         'games/PUT YOUR GAME HERE.txt','pc-vr/launch.ps1','pc-vr/settings.txt','pc-vr/package_setup.ps1',

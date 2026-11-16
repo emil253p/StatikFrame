@@ -4,7 +4,7 @@ function Get-StatikPackageInfo([string]$path) {
     try { $head = New-Object byte[] 128; $read = $stream.Read($head,0,128) } finally { $stream.Dispose() }
     if ($read -ne 128 -or [BitConverter]::ToString($head,0,4) -ne '7F-43-4E-54') { throw 'Not a valid PS4 package header.' }
     $id = [Text.Encoding]::ASCII.GetString($head,64,36).Trim([char]0)
-    if ($id -notmatch '^.{7}CUSA06929_') { throw 'StatikQuest accepts Statik CUSA06929 packages only.' }
+    if ($id -notmatch '^.{7}CUSA06929_') { throw 'StatikFrame accepts Statik CUSA06929 packages only.' }
     if (($head[0x78] -band 0x60) -or ($head[0x79] -band 0x30)) { throw 'This is an update package. Select the full base game; update installation is not supported.' }
     return $id
 }
@@ -28,12 +28,12 @@ function Read-StatikSfo([string]$path) {
 }
 function Install-StatikPackage([string]$path, [string]$destinationRoot, [string]$tool, [scriptblock]$runner) {
     $null = Get-StatikPackageInfo $path
-    if (-not (Test-Path -LiteralPath $tool)) { throw 'PkgTool is missing. Extract the complete StatikQuest package again.' }
+    if (-not (Test-Path -LiteralPath $tool)) { throw 'PkgTool is missing. Extract the complete StatikFrame package again.' }
     $games = [IO.Path]::GetFullPath((Join-Path $destinationRoot 'games'))
     $target = Join-Path $games 'cusa06929'
     if (Test-Path -LiteralPath $target) { throw "An installation already exists at $target. Select its eboot.bin; it will not be overwritten." }
     $work = Join-Path $games ('unpacking_' + [Guid]::NewGuid().ToString('N'))
-    if ($work.Length -gt 120) { throw 'Move the StatikQuest folder to a shorter path before extracting.' }
+    if ($work.Length -gt 120) { throw 'Move the StatikFrame folder to a shorter path before extracting.' }
     $free = (New-Object IO.DriveInfo([IO.Path]::GetPathRoot($games))).AvailableFreeSpace
     $estimate = (Get-Item -LiteralPath $path).Length * 3 + 1GB
     if ($free -lt $estimate) { throw ('Allow at least {0:N1} GB free for extraction (an estimate).' -f ($estimate/1GB)) }
@@ -76,7 +76,7 @@ function Get-GameError([string]$path) {
     $sfo = Join-Path (Split-Path $path) 'sce_sys\param.sfo'
     if (-not (Test-Path -LiteralPath $sfo)) { return 'The game folder is missing sce_sys\param.sfo.' }
     try { $metadata = Read-StatikSfo $sfo } catch { return 'The game metadata is invalid or unreadable.' }
-    if ($metadata.TITLE_ID -ne 'CUSA06929') { return 'StatikQuest supports Statik CUSA06929 only. Please select that game version.' }
+    if ($metadata.TITLE_ID -ne 'CUSA06929') { return 'StatikFrame supports Statik CUSA06929 only. Please select that game version.' }
     if ($metadata.CATEGORY -ne 'gd') { return 'Select the base game, not an extracted update or add-on.' }
     return ''
 }

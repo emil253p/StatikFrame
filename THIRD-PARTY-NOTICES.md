@@ -1,6 +1,7 @@
 # Third-party notices
 
-StatikQuest is GPL-2.0-or-later (see [LICENSE](LICENSE)), derived from
+StatikFrame is GPL-2.0-or-later (see [LICENSE](LICENSE)), a fork of
+[StatikQuest](https://github.com/Jerware/StatikQuest), derived from
 [AstroQuest](https://github.com/bigmak94/AstroQuest), shadPS4 and the
 shadps4-arm64 source. Original notices are retained in the emulator source.
 

@@ -1,4 +1,4 @@
-# StatikQuest PC VR defaults. Your choices are saved in settings.local.txt.
+# StatikFrame PC VR defaults. Your choices are saved in settings.local.txt.
 # Start Play Statik VR.bat. One key=value per line; # starts a comment.
 menu=1
 language=windows

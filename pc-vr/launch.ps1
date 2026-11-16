@@ -457,7 +457,7 @@ function Expand-Package($package) {
     }
     try {
         $null = Get-StatikPackageInfo $package.FullName
-        if (-not $tool) { throw "PkgTool is missing. Extract the complete StatikQuest PC package again." }
+        if (-not $tool) { throw "PkgTool is missing. Extract the complete StatikFrame PC package again." }
         $answer = Show-Box ("Unpack this Statik base-game package into the games folder? Your original package will be kept.`n`n" + $package.FullName) "YesNo" "Question"
         if ($answer -ne "Yes") { return $null }
         $runner = {
@@ -522,7 +522,7 @@ function Show-NotFound {
     $title.SetBounds(16, 14, 568, 26)
     $form.Controls.Add($title)
     $text = New-Object System.Windows.Forms.Label
-    $text.Text = "Statik: Institute of Retention was not found. StatikQuest does not contain the game: it plays your own copy of it.`n`nPut that copy in the games folder - either the game's folder (the one with eboot.bin in it) or its .pkg file - and choose Look again. Or leave it where it is and show where that is."
+    $text.Text = "Statik: Institute of Retention was not found. StatikFrame does not contain the game: it plays your own copy of it.`n`nPut that copy in the games folder - either the game's folder (the one with eboot.bin in it) or its .pkg file - and choose Look again. Or leave it where it is and show where that is."
     $text.SetBounds(16, 50, 568, 96)
     $form.Controls.Add($text)
     $where = New-Object System.Windows.Forms.Label
@@ -886,7 +886,7 @@ foreach ($name in @('savedata','trophy','inputs')) {
     [void][IO.Directory]::CreateDirectory((Join-Path $profile "home\1000\$name"))
 }
 if (-not [System.IO.File]::Exists($emulator)) {
-    [void](Show-Box ("The emulator, shadps4.exe, is missing from`n" + $here + "`n`nUnzip the whole StatikQuest package again. (Built from the source: run tools/make-pc-vr.sh.)") "OK" "Error")
+    [void](Show-Box ("The emulator, shadps4.exe, is missing from`n" + $here + "`n`nUnzip the whole StatikFrame package again. (Built from the source: run tools/make-pc-vr.sh.)") "OK" "Error")
     exit 1
 }
 # (Never a dead end: whoever has installed it and is still told it is missing can go on, and
@@ -913,7 +913,7 @@ if ($info["TITLE_ID"] -eq $madeFor -and -not [System.IO.File]::Exists([System.IO
     exit 1
 }
 if ($gameFolder.Length + 1 + $longestInside -gt 259) {
-    [void](Show-Box ("The game is in`n" + $gameFolder + "`n`nThat path is too long: some of the game's files have a path of more than 259 characters there, which the emulator cannot open, and the game would stop when it needs them. Move the folder somewhere with a shorter path, for example C:\Games\StatikQuest, and start again.") "OK" "Warning")
+    [void](Show-Box ("The game is in`n" + $gameFolder + "`n`nThat path is too long: some of the game's files have a path of more than 259 characters there, which the emulator cannot open, and the game would stop when it needs them. Move the folder somewhere with a shorter path, for example C:\Games\StatikFrame, and start again.") "OK" "Warning")
     exit 1
 }
 

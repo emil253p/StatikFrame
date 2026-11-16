@@ -51,20 +51,20 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $out = Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update'
+          $out = Join-Path $env:RUNNER_TEMP 'StatikFrame-PC-VR-update'
           New-Item -ItemType Directory -Force -Path (Join-Path $out 'pc-vr') | Out-Null
           Copy-Item build\pcvr_release\shadps4.exe (Join-Path $out 'pc-vr\shadps4.exe')
           foreach ($name in @('launch.ps1', 'settings.txt', 'default_config.json', 'package_setup.ps1')) {
             Copy-Item (Join-Path 'pc-vr' $name) (Join-Path $out "pc-vr\$name")
           }
           Copy-Item 'Play Statik VR.bat', 'README-PC-VR.md' $out
-          "Copy these over your StatikQuest folder. Your settings.local.txt, saves and game stay as they are." |
+          "Copy these over your StatikFrame folder. Your settings.local.txt, saves and game stay as they are." |
             Set-Content (Join-Path $out 'HOW-TO-UPDATE.txt')
 
       - uses: actions/upload-artifact@v4
         with:
-          name: StatikQuest-PC-VR-update
-          path: ${{ runner.temp }}/StatikQuest-PC-VR-update
+          name: StatikFrame-PC-VR-update
+          path: ${{ runner.temp }}/StatikFrame-PC-VR-update
 
       # The newest build of every branch, as a public download (no GitHub sign-in needed).
       - name: Publish test build
@@ -72,8 +72,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $zip = Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update.zip'
-          Compress-Archive -Path (Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update\*') -DestinationPath $zip
+          $zip = Join-Path $env:RUNNER_TEMP 'StatikFrame-PC-VR-update.zip'
+          Compress-Archive -Path (Join-Path $env:RUNNER_TEMP 'StatikFrame-PC-VR-update\*') -DestinationPath $zip
           gh release delete test-build --yes --cleanup-tag 2>$null
           $global:LASTEXITCODE = 0
           # The player guide in docs/TEST-BUILD-NOTES.md, then where this build came from.
@@ -96,10 +96,10 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           if ($env:VERSION -notmatch '^v[0-9]+(\.[0-9]+){1,2}$') { throw "Version must look like v0.2 or v1.0.1, not '$env:VERSION'." }
-          $zip = Join-Path $env:RUNNER_TEMP "StatikQuest-$env:VERSION-PC-VR-update.zip"
-          Compress-Archive -Path (Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update\*') -DestinationPath $zip
+          $zip = Join-Path $env:RUNNER_TEMP "StatikFrame-$env:VERSION-PC-VR-update.zip"
+          Compress-Archive -Path (Join-Path $env:RUNNER_TEMP 'StatikFrame-PC-VR-update\*') -DestinationPath $zip
           $notes = Join-Path $env:RUNNER_TEMP 'version-notes.md'
-          $text = (Get-Content -Raw -Encoding utf8 (Join-Path $env:RUNNER_TEMP 'release-notes.md')) -replace '(?m)^## StatikQuest PC VR – test build', "## StatikQuest PC VR $env:VERSION"
+          $text = (Get-Content -Raw -Encoding utf8 (Join-Path $env:RUNNER_TEMP 'release-notes.md')) -replace '(?m)^## StatikFrame PC VR – test build', "## StatikFrame PC VR $env:VERSION"
           Set-Content -Encoding utf8 -NoNewline -Path $notes -Value $text
           gh release create $env:VERSION $zip --target $env:GITHUB_SHA --latest `
-            --title "StatikQuest PC VR $env:VERSION" --notes-file $notes
+            --title "StatikFrame PC VR $env:VERSION" --notes-file $notes

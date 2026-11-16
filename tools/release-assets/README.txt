@@ -1,10 +1,10 @@
-StatikQuest @VERSION@ - Statik: Institute of Retention in VR, played on this PC and shown in
+StatikFrame @VERSION@ - Statik: Institute of Retention in VR, played on this PC and shown in
 a headset: a Meta Quest through Virtual Desktop, or a PC headset through SteamVR or an
-OpenXR runtime of its own. https://github.com/Jerware/StatikQuest
+OpenXR runtime of its own. https://github.com/emil253p/statikquest
 
 1. Put your own copy of the game in the games folder: its folder (the one with eboot.bin in
    it) or its .pkg file, which is unpacked the first time. Or skip this: a window asks where
-   the game is. Keep this folder's path short, e.g. C:\Games\StatikQuest.
+   the game is. Keep this folder's path short, e.g. C:\Games\StatikFrame.
 2. Virtual Desktop: install the Streamer on this PC and choose VDXR as the OpenXR runtime in
    its Options. For positional controller tracking, enable hand tracking on the headset
    and Virtual Desktop's "Forward tracking data to PC" feature.
@@ -25,7 +25,7 @@ Quest app. Built-in JSON support is used; no separate decrypted JSON module is r
 Defaults are in pc-vr\settings.txt, personal settings in pc-vr\settings.local.txt, logs in
 pc-vr\user\log, and saves in pc-vr\user\home. Keep your profile when updating; do not share
 a used play folder, as it contains your saves and other private data.
-Full installation and troubleshooting: https://github.com/Jerware/StatikQuest#readme
+Full installation and troubleshooting: https://github.com/emil253p/statikquest#readme
 
-StatikQuest is free software under the GNU GPL, version 2 or later (LICENSE.txt); the source
+StatikFrame is free software under the GNU GPL, version 2 or later (LICENSE.txt); the source
 is at the address above. It contains no part of the game: use it only with a game you own.

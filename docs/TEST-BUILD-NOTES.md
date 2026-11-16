@@ -1,9 +1,9 @@
-## StatikQuest PC VR – test build
+## StatikFrame PC VR – test build
 
 ### How to update
 1. Close the game if it is running.
-2. Download the `StatikQuest-…-PC-VR-update.zip` file below and unzip it.
-3. Copy its contents over your StatikQuest folder and say yes to replacing files. Your settings, saves and game files are kept.
+2. Download the `StatikFrame-…-PC-VR-update.zip` file below and unzip it.
+3. Copy its contents over your StatikFrame folder and say yes to replacing files. Your settings, saves and game files are kept.
 4. Start **Play Statik VR.bat**.
 
 ### What's new
@@ -19,3 +19,6 @@ Add these lines to `pc-vr\settings.local.txt`:
 
 ### If SteamVR buttons are wrong
 In SteamVR's controller bindings for **StatikQuest**, pick the default bindings.
+
+### Thanks
+StatikFrame is a fork of [Jerware/StatikQuest](https://github.com/Jerware/StatikQuest), built on [AstroQuest](https://github.com/bigmak94/AstroQuest), [shadPS4](https://github.com/shadps4-emu/shadPS4) and [shadps4-arm64](https://github.com/zenithblue-oss/shadps4-arm64). All the credit for Statik in VR goes to them; see the [README](https://github.com/emil253p/statikquest#thanks) for everyone involved.

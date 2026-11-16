@@ -1,4 +1,6 @@
-# StatikQuest
+# StatikFrame
+
+> **StatikFrame is a fork of [Jerware/StatikQuest](https://github.com/Jerware/StatikQuest)**, made for the **Valve Steam Frame** and other SteamVR headsets: its motion controllers can stand in for the PS4 controller, with every Steam Frame button mapped, the in-game box held between both hands, and sharper per-eye resolution options. Everything else, from the Statik support itself to the PSVR emulation underneath, comes from the projects credited below; please give them a star.
 
 **Statik: Institute of Retention (PS4 / PlayStation VR) in virtual reality**, played from your own copy of the game through a PS4 emulator. Ways to play:
 
@@ -9,7 +11,7 @@ There is no standalone Quest build: **a Windows PC is required**.
 
 The emulator is [shadPS4](https://github.com/shadps4-emu/shadPS4), with inherited work from [AstroQuest](https://github.com/bigmak94/AstroQuest) and [shadps4-arm64](https://github.com/zenithblue-oss/shadps4-arm64). This fork adapts that work for Statik, with fixes for stereo rendering, tracking, reprojection and other issues under emulation.
 
-The code additions for Statik support were made 100% by AI: GPT-6.1 Sol in Codex. This credit applies to the Statik-specific additions, not the inherited AstroQuest, shadPS4 or third-party code.
+The code additions for Statik support were made 100% by AI: GPT-6.1 Sol in Codex. This credit applies to the Statik-specific additions, not the inherited AstroQuest, shadPS4 or third-party code. StatikFrame's own additions (Steam Frame controls, two-handed box, sharpness options) were made with Claude Code.
 
 > **No game files are included or distributed.** You need your own copy of Statik: Institute of Retention, dumped from your own PlayStation 4.
 
@@ -29,11 +31,11 @@ Work in progress. Most levels have been tested, but not all. The current Windows
 
 ## Installing: PC VR through Virtual Desktop
 
-Download the Windows PC ZIP from the [latest release](https://github.com/Jerware/StatikQuest/releases/latest) and unzip it. There is no standalone Quest APK.
+Download the Windows PC ZIP from the [latest release](https://github.com/emil253p/statikquest/releases/latest) and unzip it. There is no standalone Quest APK.
 
 A source checkout does not include the emulator executable: follow [Building from source](#building-from-source) first. With a prepared PC build, keep the whole folder together, then:
 
-1. **Put it in a folder with a short path**, e.g. `C:\Games\StatikQuest`. Some of the game's files have long names, and the emulator cannot open a file whose full path exceeds Windows' path limit. The launcher warns if the game path is too long.
+1. **Put it in a folder with a short path**, e.g. `C:\Games\StatikFrame`. Some of the game's files have long names, and the emulator cannot open a file whose full path exceeds Windows' path limit. The launcher warns if the game path is too long.
 2. **Put your copy of the game in its `games` folder**, anywhere in it: the game's folder (the one with `eboot.bin` in it) or its `.pkg` file. A compatible package is unpacked the first time you start. You can also leave the game where it is: when the launcher finds none, a window asks where it is and remembers the answer. The original package is kept; existing installations are not overwritten.
 3. **Set up Virtual Desktop**: install the Streamer on the PC and, in its Options, choose **VDXR** as the OpenXR runtime. In Virtual Desktop's streaming settings in the headset, set the frame rate to **90 Hz**, which matches the launcher's default of 90 fps; its 60 fps and 120 fps settings need 120 Hz.
 4. **Connect the DualSense to the PC**, by USB cable or by Bluetooth paired with the PC, not with the headset: paired with the headset, it can reach the PC without motion sensors or touchpad. Disable Steam Input if using a Steam shortcut.
@@ -66,7 +68,7 @@ All settings and what to do when something does not work are in [README-PC-VR.md
 Clone with the submodules:
 
 ```sh
-git clone --recurse-submodules https://github.com/Jerware/StatikQuest.git
+git clone --recurse-submodules https://github.com/emil253p/statikquest.git
 ```
 
 The PC build uses Visual Studio C++ Build Tools with a Windows SDK and CMake/Ninja, plus LLVM (`clang-cl`, `llvm-lib` and `llvm-rc`). LLVM 21.1.8 was used locally. No Sony SDK is required.
@@ -79,7 +81,7 @@ The full commands and requirements are in [docs/BUILDING.md](docs/BUILDING.md). 
 
 ## License
 
-StatikQuest is free software, licensed under the [GNU General Public License, version 2 or (at your option) any later version](LICENSE) (GPL-2.0-or-later), the license of shadPS4 it is built on.
+StatikFrame is free software, licensed under the [GNU General Public License, version 2 or (at your option) any later version](LICENSE) (GPL-2.0-or-later), the license of shadPS4 it is built on.
 
 The third-party components it uses or ships keep their own licenses, including PkgTool (LGPL-3.0), the Khronos OpenXR SDK (Apache-2.0) and the libraries under `shadps4-arm64-main/externals`. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for their notices and sources.
 
@@ -87,6 +89,9 @@ This project is not affiliated with, endorsed or sponsored by the game's publish
 
 ## Thanks
 
+StatikFrame stands on the work of these projects and people:
+
+- **[Jerware/StatikQuest](https://github.com/Jerware/StatikQuest)** by Jeremy Williams, the project this fork comes from: Statik support, the PC launcher, package setup and everything needed to play Statik in VR in the first place.
 - **[bigmak94/AstroQuest](https://github.com/bigmak94/AstroQuest)**, for the project and PSVR work this fork builds on.
 - **The [shadPS4](https://github.com/shadps4-emu/shadPS4) team and contributors.** None of this would exist without their PlayStation 4 emulator: everything here is built on top of their years of work. Thank you!
 - [zenithblue-oss/shadps4-arm64](https://github.com/zenithblue-oss/shadps4-arm64), for the inherited emulator source.
