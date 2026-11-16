@@ -2,7 +2,7 @@
 
 ### How to update
 1. Close the game if it is running.
-2. Download `StatikQuest-PC-VR-update.zip` below and unzip it.
+2. Download the `StatikQuest-…-PC-VR-update.zip` file below and unzip it.
 3. Copy its contents over your StatikQuest folder and say yes to replacing files. Your settings, saves and game files are kept.
 4. Start **Play Statik VR.bat**.
 

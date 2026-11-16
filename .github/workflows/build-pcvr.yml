@@ -3,9 +3,15 @@
 name: Build PC VR
 
 # Manual only: start it from the Actions tab (Build PC VR > Run workflow) when a version
-# is worth building. Pushes do not build.
+# is worth building. Pushes do not build. Give it a version (v0.2, ...) to publish a release
+# of that name as well as the test build.
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (for example v0.2). Empty: test build only."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -79,3 +85,21 @@ jobs:
           gh release create test-build $zip --prerelease --target $env:GITHUB_SHA `
             --title "Test build ($($env:GITHUB_SHA.Substring(0, 7)))" `
             --notes-file $notes
+
+      # A named release (and its tag) of this same build, when a version was given. An
+      # existing version is never replaced: choose a new one.
+      - name: Publish release
+        if: ${{ inputs.version != '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:VERSION -notmatch '^v[0-9]+(\.[0-9]+){1,2}$') { throw "Version must look like v0.2 or v1.0.1, not '$env:VERSION'." }
+          $zip = Join-Path $env:RUNNER_TEMP "StatikQuest-$env:VERSION-PC-VR-update.zip"
+          Compress-Archive -Path (Join-Path $env:RUNNER_TEMP 'StatikQuest-PC-VR-update\*') -DestinationPath $zip
+          $notes = Join-Path $env:RUNNER_TEMP 'version-notes.md'
+          $text = (Get-Content -Raw -Encoding utf8 (Join-Path $env:RUNNER_TEMP 'release-notes.md')) -replace '(?m)^## StatikQuest PC VR – test build', "## StatikQuest PC VR $env:VERSION"
+          Set-Content -Encoding utf8 -NoNewline -Path $notes -Value $text
+          gh release create $env:VERSION $zip --target $env:GITHUB_SHA --latest `
+            --title "StatikQuest PC VR $env:VERSION" --notes-file $notes
