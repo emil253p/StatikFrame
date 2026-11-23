@@ -19,15 +19,25 @@ sdk=registry.gitlab.steamos.cloud/steamrt/steamrt4/sdk/arm64:4.0.20260805.254769
 container=statikquest-build
 if [[ ${1:-} != --container ]]; then
   command -v podman >/dev/null || { echo "podman is required." >&2; exit 1; }
-  if ! podman container exists "$container"; then
-    podman create --name "$container" --network host -v "$root:$root" -w "$root" \
-      "$sdk" sleep infinity
-  fi
-  [[ $(podman inspect --format '{{.Config.Image}}' "$container") == "$sdk" ]] || {
-    echo "The $container container uses a different SDK: podman rm -f $container" >&2; exit 1;
+  # Over SSH there is no user systemd session for podman to put the container under
+  # ("crun: sd-bus call: Process org.freedesktop.systemd1 exited"): podman manages its
+  # cgroups itself and logs its events to a file instead.
+  podman=(podman --cgroup-manager=cgroupfs --events-backend=file)
+  create() {
+    "${podman[@]}" create --name "$container" --network host -v "$root:$root" -w "$root" \
+      "$sdk" sleep infinity >/dev/null
   }
-  podman start "$container" >/dev/null
-  exec podman exec "$container" bash "$root/tools/build-frame.sh" --container
+  if ! "${podman[@]}" container exists "$container"; then
+    create
+  elif [[ $("${podman[@]}" inspect --format '{{.Config.Image}}' "$container") != "$sdk" ]] ||
+       ! "${podman[@]}" start "$container" >/dev/null 2>&1; then
+    # Another SDK, or made by an earlier try that could not start: made again (nothing of
+    # the build is in it; the source and build folders are this clone's).
+    "${podman[@]}" rm -f "$container" >/dev/null
+    create
+  fi
+  "${podman[@]}" start "$container" >/dev/null
+  exec "${podman[@]}" exec "$container" bash "$root/tools/build-frame.sh" --container
 fi
 
 export DEBIAN_FRONTEND=noninteractive
