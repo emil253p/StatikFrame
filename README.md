@@ -7,6 +7,8 @@
 
 There is no standalone Quest build: **a Windows PC is required**.
 
+**Steam Frame standalone (experimental, untested):** a native ARM64 Linux build that runs on the headset itself; see [README-FRAME.md](README-FRAME.md).
+
 The emulator is [shadPS4](https://github.com/shadps4-emu/shadPS4), with inherited work from [AstroQuest](https://github.com/bigmak94/AstroQuest) and [shadps4-arm64](https://github.com/zenithblue-oss/shadps4-arm64). This fork adapts that work for Statik, with fixes for stereo rendering, tracking, reprojection and other issues under emulation.
 
 The code additions for Statik support were made 100% by AI: GPT-6.1 Sol in Codex. This credit applies to the Statik-specific additions, not the inherited AstroQuest, shadPS4 or third-party code.

@@ -23,3 +23,10 @@ emulator source; their presence is not a standalone Quest distribution.
 No game data, PS4 firmware, decrypted system modules, keys, saves or proprietary
 SDK files are part of this repository. Used `pc-vr/user` profiles and personal
 settings must not be included in release staging.
+
+## AstroQuest-Frame
+
+The Steam Frame build scripts (`tools/build-frame.sh`, `tools/launch-frame.sh`,
+`tools/install-frame.sh`) and the Linux/FEX changes to the emulator are adapted from
+[AstroQuest-Frame](https://github.com/mitch030504/AstroQuest-Frame) by DieMitchell,
+GPL-2.0-or-later.

@@ -12,12 +12,14 @@
 #include <mutex>
 #include <thread>
 
+#ifdef _WIN32
 #include <windows.h>
 
 #include <mmdeviceapi.h>
 #include <objbase.h>
 #include <propidl.h>
 #include <unknwn.h>
+#endif
 
 #include <SDL3/SDL_events.h>
 
@@ -34,7 +36,9 @@
 #include "input/view_turn.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 
+#ifdef _WIN32
 #define XR_USE_PLATFORM_WIN32
+#endif
 #define XR_USE_GRAPHICS_API_VULKAN
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
@@ -67,10 +71,16 @@ constexpr const char* UsualInstanceExtensions[] = {
 constexpr const char* UsualDeviceExtensions[] = {
     "VK_KHR_dedicated_allocation",    "VK_KHR_get_memory_requirements2",
     "VK_KHR_bind_memory2",            "VK_KHR_external_memory",
-    "VK_KHR_external_memory_win32",   "VK_KHR_external_semaphore",
-    "VK_KHR_external_semaphore_win32", "VK_KHR_external_fence",
-    "VK_KHR_external_fence_win32",    "VK_KHR_timeline_semaphore",
-    "VK_KHR_win32_keyed_mutex",       "VK_KHR_image_format_list",
+    "VK_KHR_external_semaphore",      "VK_KHR_external_fence",
+#ifdef _WIN32
+    "VK_KHR_external_memory_win32",   "VK_KHR_external_semaphore_win32",
+    "VK_KHR_external_fence_win32",    "VK_KHR_win32_keyed_mutex",
+#else
+    // (Steam Frame: SteamVR on Linux shares images by file descriptor.)
+    "VK_KHR_external_memory_fd",      "VK_KHR_external_semaphore_fd",
+    "VK_KHR_external_fence_fd",
+#endif
+    "VK_KHR_timeline_semaphore",      "VK_KHR_image_format_list",
     "VK_KHR_maintenance1",            "VK_KHR_maintenance2",
     "VK_KHR_multiview",               "VK_KHR_create_renderpass2",
 };
@@ -181,6 +191,7 @@ XrQuaternionf FromAxes(const XrVector3f& x, const XrVector3f& y, const XrVector3
     return {q.x / n, q.y / n, q.z / n, q.w / n};
 }
 
+#ifdef _WIN32
 std::string Narrow(const wchar_t* text) {
     const int size = WideCharToMultiByte(CP_UTF8, 0, text, -1, nullptr, 0, nullptr, nullptr);
     if (size <= 1) {
@@ -305,6 +316,8 @@ std::string ActiveAudioDeviceEnding(std::string_view ending, EDataFlow flow) {
     }
     return found;
 }
+
+#endif // _WIN32
 
 } // namespace
 
@@ -574,7 +587,9 @@ struct OpenXrHost::Impl {
         };
         hand_extension = track_hands && enable_if_offered(XR_EXT_HAND_TRACKING_EXTENSION_NAME);
         has_refresh_rate = enable_if_offered(XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME);
+#ifdef _WIN32
         has_audio_guid = enable_if_offered(XR_OCULUS_AUDIO_DEVICE_GUID_EXTENSION_NAME);
+#endif
         // Steam Frame controllers: without their own bindings SteamVR remaps the Touch ones,
         // which puts three buttons on each of Touch's B and Y and loses the rest.
         has_frame_controller = enable_if_offered("XR_VALVE_frame_controller_interaction");
@@ -718,6 +733,7 @@ struct OpenXrHost::Impl {
     void FindAudioDevices() {
         std::string output_name;
         std::string input_name;
+#ifdef _WIN32
         if (has_audio_guid) {
             using Function = XrResult(XRAPI_PTR*)(XrInstance, wchar_t*);
             const auto output =
@@ -751,6 +767,7 @@ struct OpenXrHost::Impl {
                 input_name = std::move(microphone);
             }
         }
+#endif
         std::scoped_lock lock{names_mutex};
         if (audio_names_known && output_name == audio_output && input_name == audio_input) {
             return;
