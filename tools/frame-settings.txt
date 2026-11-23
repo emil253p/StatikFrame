@@ -33,6 +33,8 @@ right_stick=both
 language=system
 # Sharpening of the picture in the headset, 0 to 1.
 sharpen=0.3
+# Pause the game while the headset is off or the Steam dashboard is in front (1), or never (0).
+pause=0
 # Seconds to wait for the headset before giving up.
 wait=30
 # GPU work in smaller pieces (draws per piece; 0 = a whole frame at once), and MSAA at most.

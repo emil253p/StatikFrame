@@ -82,7 +82,9 @@ fi
 unset $(compgen -e | grep '^SHADPS4_' || true)
 export SHADPS4_VR=1 SHADPS4_OPENXR=1 SHADPS4_VR_DEMO=0
 export SHADPS4_XR_HEAD=1 SHADPS4_XR_HANDS=1 SHADPS4_XR_GRIPS=1 SHADPS4_XR_CONTROLLERS=1
-export SHADPS4_XR_PAUSE=$([[ $(setting pause 1) == 0 ]] && echo 0 || echo 1)
+# (Off by default on the Frame: its runtime can report the game only "visible" while it is in
+# front, which would keep it waiting with a black picture.)
+export SHADPS4_XR_PAUSE=$([[ $(setting pause 0) == 1 ]] && echo 1 || echo 0)
 export SHADPS4_VR_SHARPEN=$(setting sharpen 0.3)
 export SHADPS4_XR_WAIT=$(setting wait 30)
 export SHADPS4_NEO_MODE=$([[ $pro == 0 ]] && echo 0 || echo 1)
