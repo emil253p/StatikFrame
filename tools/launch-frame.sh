@@ -37,7 +37,7 @@ runtime="$HOME/.local/share/Steam/steamapps/common/SteamLinuxRuntime_4-arm64/run
 frame_rate=$(setting frame_rate 60)
 case $frame_rate in 60|90|120) ;; *) frame_rate=60 ;; esac
 resolution=$(setting resolution game)
-case $resolution in game|180|220|260) ;; *) resolution=game ;; esac
+case $resolution in game|180|200|220|240|260|280|300) ;; *) resolution=game ;; esac
 pro=$(setting pro 0)
 
 # The game's engine settings, as the PC launcher writes them (see Set-EngineSettings there):
@@ -88,6 +88,8 @@ export SHADPS4_XR_WAIT=$(setting wait 30)
 export SHADPS4_NEO_MODE=$([[ $pro == 0 ]] && echo 0 || echo 1)
 export SHADPS4_XR_TWO_HANDS=$([[ $(setting two_hands 1) == 0 ]] && echo 0 || echo 1)
 export SHADPS4_XR_RIGHT_STICK=$(setting right_stick both)
+export SHADPS4_XR_BOX_DEPTH=$(setting box_depth 8)
+[[ -n $(setting box_steady "") ]] && export SHADPS4_XR_BOX_STEADY=$(setting box_steady "")
 [[ $(setting controller_hand right) == left ]] && export SHADPS4_XR_PAD_HAND=left
 fov=$(setting fov 110)
 [[ $fov != 100 ]] && export SHADPS4_VR_FOV=$fov

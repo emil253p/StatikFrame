@@ -9,7 +9,7 @@ game=~/Games/Statik/CUSA06929
 # the headset's chip: start with 60.
 frame_rate=60
 # Per-eye sharpness, a percentage of the 960x1080 PSVR panel: game (145% base PS4, 180% Pro),
-# 180, 220 or 260. On the headset's own chip, start with the game's own.
+# 180 to 300 in steps of 20. On the headset's own chip, start with the game's own.
 resolution=game
 # PS4 Pro mode (1) draws sharper and costs more; 0 is a base PS4.
 pro=0
@@ -20,6 +20,10 @@ fov_of=psvr
 
 # Both motion controllers hold the game's controller together (1), or only one (0).
 two_hands=1
+# Centimetres the box held in both hands sits towards you from the controllers (0 = at their tips).
+box_depth=8
+# Hands closer than the first number (cm) turn the box by the wrists alone, farther than the second by the line between them.
+#box_steady=10,30
 # The hand that holds it alone: right or left.
 controller_hand=right
 # The right stick: both (the PS4's right stick and a finger on the touchpad), stick, or touchpad.
