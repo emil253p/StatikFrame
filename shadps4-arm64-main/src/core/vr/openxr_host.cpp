@@ -1328,8 +1328,10 @@ struct OpenXrHost::Impl {
     }
 
     /// The other hand's grip held: the right stick turns the view (see UpdateControllers).
+    /// Not while both hands hold the game's controller: they squeeze both grips to hold it,
+    /// and every sideways push of the right stick turned the whole view 30 degrees.
     bool turning_now(float left_grip, float right_grip) const {
-        return (pad_hand == 0 ? right_grip : left_grip) > 0.5f;
+        return !two_hands_held && (pad_hand == 0 ? right_grip : left_grip) > 0.5f;
     }
 
     /// For the log: which of the controllers' bindings the runtime uses for each hand.
@@ -1651,7 +1653,7 @@ struct OpenXrHost::Impl {
         // The grip of the other hand, which is left without a meaning, held: each flick of
         // the right stick to a side turns the view a step that way (see Input::ViewTurn), for
         // players who cannot turn round where they sit. The stick moves no finger meanwhile.
-        const bool turning = (pad_hand == 0 ? right_grip : left_grip) > 0.5f;
+        const bool turning = turning_now(left_grip, right_grip);
         if (const int steps = view_turn.Update(turning, finger.x); steps != 0) {
             Runtime::Instance().TurnView(steps);
         }

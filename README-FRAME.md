@@ -59,4 +59,6 @@ Raise them once the game runs well. Saves, logs and caches are in
 
 Controls are as on the PC with Steam Frame controllers: right A ✕, B ○, X □, Y △ (B + Y
 blow), left D-pad, View/Menu OPTIONS, bumpers and grips L1/R1, triggers L2/R2, both
-controllers hold the box.
+controllers hold the box (while they do, a right-stick flick with the grip held does not
+turn the view). If you face away from where the headset set its straight ahead, the game
+turns its straight ahead to face you when it starts.

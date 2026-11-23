@@ -78,6 +78,9 @@ installation paths short.
   close together the box's tilt and turn come from the wrists rather than the
   line between the hands, which would swing fast; `box_steady=10,30` (cm) is
   where it is the wrists alone and where it is the line alone.
+  A tracking blink of under a quarter of a second keeps the box where both hands
+  held it. While both hands hold it, the grip + right-stick flick does not turn
+  the view (holding the box squeezes both grips).
 
 Upstream's resolution and frame-rate controls patched Astro Bot and cannot
 override Statik. Old `fps`, `dynamic`, `pace` and `real_time` settings are not
