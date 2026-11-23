@@ -410,6 +410,11 @@ struct OpenXrHost::Impl {
     XrTime space_change_time{};
     // The same once more, a moment after the runtime said it would be done (see below).
     XrTime space_settled_time{};
+    // The space the emulator works in is LOCAL turned to face where the player faced when the
+    // session began (see FaceForward); on Steam Frame, LOCAL's straight ahead can be behind
+    // them, which nothing else in the emulator expects.
+    bool face_forward{true};
+    bool local_faced{};
     u32 max_swapchain_width{};
     u32 max_swapchain_height{};
     Clock::time_point last_search;
@@ -1886,6 +1891,7 @@ struct OpenXrHost::Impl {
             xrDestroySpace(local_space);
             local_space = XR_NULL_HANDLE;
         }
+        local_faced = false;
         if (view_space != XR_NULL_HANDLE) {
             xrDestroySpace(view_space);
             view_space = XR_NULL_HANDLE;
@@ -2257,6 +2263,54 @@ struct OpenXrHost::Impl {
 
     // --- tracking -----------------------------------------------------------------------------
 
+    /// Makes the emulator's space LOCAL turned by `yaw` radians about the vertical: what it
+    /// calls straight ahead is that way. False if the runtime makes no such space.
+    bool TurnLocalSpace(float yaw) {
+        XrReferenceSpaceCreateInfo info{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
+        info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+        info.poseInReferenceSpace.orientation = {0.0f, std::sin(yaw * 0.5f), 0.0f,
+                                                 std::cos(yaw * 0.5f)};
+        XrSpace turned = XR_NULL_HANDLE;
+        if (XR_FAILED(xrCreateReferenceSpace(session, &info, &turned)) ||
+            turned == XR_NULL_HANDLE) {
+            return false;
+        }
+        if (local_space != XR_NULL_HANDLE) {
+            xrDestroySpace(local_space);
+        }
+        local_space = turned;
+        return true;
+    }
+
+    /// The first time the head is seen in a session: if the player faces well away from the
+    /// runtime's straight ahead (Steam Frame standalone sets it where the headset was put on
+    /// or last reset, which can be behind a seated player), the emulator's space is turned to
+    /// face them, as it would be on a PC where they sit facing it. Everything after counts
+    /// from there. True if the space was turned (the head is located again next frame).
+    /// (SHADPS4_XR_FACE_FORWARD=0 leaves LOCAL as it is.)
+    bool FaceForward(const XrQuaternionf& head) {
+        if (local_faced || !face_forward) {
+            return false;
+        }
+        local_faced = true;
+        const Quat yaw_turn = YawOnly(Quat{head.x, head.y, head.z, head.w});
+        const float yaw = 2.0f * std::atan2(yaw_turn.y, yaw_turn.w);
+        if (std::abs(yaw) < 20.0f / 57.29578f) {
+            return false;
+        }
+        if (!TurnLocalSpace(yaw)) {
+            LOG_WARNING(Core_Vr, "The headset's space could not be turned to face the player");
+            return false;
+        }
+        LOG_INFO(Core_Vr,
+                 "The player faces {:.0f} degrees from the headset's straight ahead: the game's "
+                 "straight ahead is turned to face them",
+                 yaw * 57.29578f);
+        Runtime::Instance().RequestRecenter();
+        Runtime::Instance().ResetPadYaw();
+        return true;
+    }
+
     void UpdateHead(XrTime time) {
         auto& runtime = Runtime::Instance();
         XrSpaceVelocity velocity{XR_TYPE_SPACE_VELOCITY};
@@ -2265,6 +2319,9 @@ struct OpenXrHost::Impl {
         if (XR_SUCCEEDED(xrLocateSpace(view_space, local_space, time, &location)) &&
             (location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0 &&
             (location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0) {
+            if (FaceForward(location.pose.orientation)) {
+                return;
+            }
             DeviceState state;
             state.pose.position = {location.pose.position.x, location.pose.position.y,
                                    location.pose.position.z};
@@ -2293,6 +2350,11 @@ struct OpenXrHost::Impl {
         if (space_change_time != 0 && time >= space_change_time) {
             space_change_time = 0;
             LOG_INFO(Core_Vr, "View reset in the headset's own system");
+            // Its straight ahead is where the player faces now: the emulator's space is LOCAL
+            // as it is again (a turn made by FaceForward would now be one too many).
+            if (local_faced && TurnLocalSpace(0.0f)) {
+                local_faced = true;
+            }
             runtime.RequestRecenter();
             runtime.ResetPadYaw();
             // SteamVR on Steam Frame names a moment a little before the space has moved: the
@@ -3063,6 +3125,7 @@ bool OpenXrHost::Connect() {
     // SHADPS4_XR_TWO_HANDS=0: one controller (SHADPS4_XR_PAD_HAND) holds the game's
     // controller, not both together.
     impl->two_hands = EnvFlag("SHADPS4_XR_TWO_HANDS", true);
+    impl->face_forward = EnvFlag("SHADPS4_XR_FACE_FORWARD", true);
     // SHADPS4_XR_BOX_DEPTH: centimetres the box held in both hands sits towards the player
     // from between the controllers (8 by default; 0 holds it at the controllers' tips).
     impl->two_hands_depth = EnvFloat("SHADPS4_XR_BOX_DEPTH", 8.0f) * 0.01f;
