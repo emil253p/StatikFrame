@@ -408,6 +408,8 @@ struct OpenXrHost::Impl {
     Clock::time_point connect_time;
     bool exit_requested{};
     XrTime space_change_time{};
+    // The same once more, a moment after the runtime said it would be done (see below).
+    XrTime space_settled_time{};
     u32 max_swapchain_width{};
     u32 max_swapchain_height{};
     Clock::time_point last_search;
@@ -2263,6 +2265,16 @@ struct OpenXrHost::Impl {
         if (space_change_time != 0 && time >= space_change_time) {
             space_change_time = 0;
             LOG_INFO(Core_Vr, "View reset in the headset's own system");
+            runtime.RequestRecenter();
+            runtime.ResetPadYaw();
+            // SteamVR on Steam Frame names a moment a little before the space has moved: the
+            // head is then still where it was in the old space (turned round, say), and the
+            // seat would face that way once the space has moved under it. Half a second later
+            // the space has certainly moved: the seat is taken again then.
+            space_settled_time = time + 500'000'000;
+        }
+        if (space_settled_time != 0 && time >= space_settled_time) {
+            space_settled_time = 0;
             runtime.RequestRecenter();
             runtime.ResetPadYaw();
         }

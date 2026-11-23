@@ -133,6 +133,15 @@ int PS4_SYSV_ABI posix_pthread_setspecific(PthreadKeyT key, const void* value) {
     return 0;
 }
 
+// The value a thread keeps under a key is the title's own business: any 64 bits, not
+// necessarily a pointer (Unreal Engine's task threads keep small numbers such as 1 or 2).
+// Taken as a number, so that the FEX call bridge does not check it as a guest address and
+// refuse the call (EFAULT) for a value under 4096: setspecific failed for every one of
+// them on Steam Frame, and the engine went on with nothing kept.
+int PS4_SYSV_ABI posix_pthread_setspecific_value(PthreadKeyT key, uintptr_t value) {
+    return posix_pthread_setspecific(key, reinterpret_cast<const void*>(value));
+}
+
 const void* PS4_SYSV_ABI posix_pthread_getspecific(PthreadKeyT key) {
     Pthread* pthread = g_curthread;
 
@@ -153,18 +162,18 @@ void RegisterSpec(Core::Loader::SymbolsResolver* sym) {
     LIB_FUNCTION("mqULNdimTn0", "libScePosix", 1, "libkernel", posix_pthread_key_create);
     LIB_FUNCTION("6BpEZuDT7YI", "libScePosix", 1, "libkernel", posix_pthread_key_delete);
     LIB_FUNCTION("0-KXaS70xy4", "libScePosix", 1, "libkernel", posix_pthread_getspecific);
-    LIB_FUNCTION("WrOLvHU0yQM", "libScePosix", 1, "libkernel", posix_pthread_setspecific);
+    LIB_FUNCTION("WrOLvHU0yQM", "libScePosix", 1, "libkernel", posix_pthread_setspecific_value);
 
     // Posix-Kernel
     LIB_FUNCTION("mqULNdimTn0", "libkernel", 1, "libkernel", posix_pthread_key_create);
     LIB_FUNCTION("0-KXaS70xy4", "libkernel", 1, "libkernel", posix_pthread_getspecific);
-    LIB_FUNCTION("WrOLvHU0yQM", "libkernel", 1, "libkernel", posix_pthread_setspecific);
+    LIB_FUNCTION("WrOLvHU0yQM", "libkernel", 1, "libkernel", posix_pthread_setspecific_value);
 
     // Orbis
     LIB_FUNCTION("geDaqgH9lTg", "libkernel", 1, "libkernel", ORBIS(posix_pthread_key_create));
     LIB_FUNCTION("PrdHuuDekhY", "libkernel", 1, "libkernel", ORBIS(posix_pthread_key_delete));
     LIB_FUNCTION("eoht7mQOCmo", "libkernel", 1, "libkernel", posix_pthread_getspecific);
-    LIB_FUNCTION("+BzXYkqYeLE", "libkernel", 1, "libkernel", ORBIS(posix_pthread_setspecific));
+    LIB_FUNCTION("+BzXYkqYeLE", "libkernel", 1, "libkernel", ORBIS(posix_pthread_setspecific_value));
 }
 
 } // namespace Libraries::Kernel
