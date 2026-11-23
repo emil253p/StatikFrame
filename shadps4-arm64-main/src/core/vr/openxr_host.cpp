@@ -493,6 +493,11 @@ struct OpenXrHost::Impl {
     bool right_stick_finger{true};
     bool right_stick_stick{true};
     bool two_hands_held{};
+    // Why the two hands last held nothing (for the log), and the last time and pose they
+    // did hold the controller: a moment's miss keeps that pose (see UpdateControllers).
+    const char* two_hands_miss{""};
+    XrTime two_hands_ok_time{};
+    XrPosef two_hands_last_pose{{0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}};
     XrQuaternionf two_hands_turn{0.0f, 0.0f, 0.0f, 1.0f};
     XrTime two_hands_time{};
     XrVector3f two_hands_spin{};
@@ -1196,6 +1201,7 @@ struct OpenXrHost::Impl {
         int moving_count = 0;
         for (int hand = 0; hand < 2; ++hand) {
             if (aim_spaces[hand] == XR_NULL_HANDLE) {
+                two_hands_miss = "no pose for a controller";
                 return false;
             }
             XrSpaceVelocity hand_velocity{XR_TYPE_SPACE_VELOCITY};
@@ -1203,6 +1209,8 @@ struct OpenXrHost::Impl {
             hand_location.next = &hand_velocity;
             if (XR_FAILED(xrLocateSpace(aim_spaces[hand], local_space, time, &hand_location)) ||
                 (hand_location.locationFlags & Needed) != Needed) {
+                two_hands_miss = hand == 0 ? "the left controller is not tracked"
+                                           : "the right controller is not tracked";
                 return false;
             }
             poses[hand] = hand_location.pose;
@@ -1217,6 +1225,7 @@ struct OpenXrHost::Impl {
         const float apart = Length(across);
         // (Hands together, or one stretched far away to point at something, hold nothing.)
         if (apart < 0.06f || apart > 1.2f) {
+            two_hands_miss = apart < 0.06f ? "the hands are together" : "the hands are far apart";
             return false;
         }
         across = {across.x / apart, across.y / apart, across.z / apart};
@@ -1254,6 +1263,7 @@ struct OpenXrHost::Impl {
         const float back_length = Length(back);
         if (back_length < 0.2f) {
             // The wrists turned so far that "up" is along the line between them.
+            two_hands_miss = "the wrists are turned too far";
             return false;
         }
         back = {back.x / back_length, back.y / back_length, back.z / back_length};
@@ -1677,16 +1687,34 @@ struct OpenXrHost::Impl {
         XrSpaceVelocity velocity{XR_TYPE_SPACE_VELOCITY};
         XrSpaceLocation location{XR_TYPE_SPACE_LOCATION};
         location.next = &velocity;
-        const bool both = two_hands && LocateTwoHands(time, location, velocity);
+        bool both = two_hands && LocateTwoHands(time, location, velocity);
+        if (both) {
+            two_hands_ok_time = time;
+            two_hands_last_pose = location.pose;
+        } else if (two_hands && two_hands_held && time - two_hands_ok_time < 250'000'000) {
+            // A moment's miss (a controller's tracking blinks, a wrist turns through the
+            // limit) keeps the box where both hands last held it, instead of jumping to the
+            // one controller's tip and back: only a quarter of a second of misses lets go.
+            both = true;
+            location.locationFlags =
+                XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+            location.pose = two_hands_last_pose;
+            velocity.velocityFlags = 0;
+        }
         const bool located =
             both || (XR_SUCCEEDED(xrLocateSpace(controller_space, local_space, time, &location)) &&
                      (location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0 &&
                      (location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0);
         if (both != two_hands_held) {
             two_hands_held = both;
-            LOG_INFO(Core_Vr, "The controller in the game is held {}",
-                     both ? "in both hands, between the two controllers"
-                          : "by one controller");
+            if (both) {
+                LOG_INFO(Core_Vr,
+                         "The controller in the game is held in both hands, between the two "
+                         "controllers");
+            } else {
+                LOG_INFO(Core_Vr, "The controller in the game is held by one controller ({})",
+                         two_hands ? two_hands_miss : "two_hands=0");
+            }
         }
         if (located) {
             // (SHADPS4_XR_PAD_OFFSET: where the gamepad is taken to be, from the point the
